@@ -27,7 +27,7 @@ typedef struct {
   void *snapshot;
   size_t version;
   
-  void **op_cache;
+  void *op_cache;
   size_t op_cache_capacity;
   // op cache
   // metadata

@@ -101,6 +101,15 @@ void db_get(database *db, const sds doc_name, void *user, db_get_cb callback) {
   callback(NULL, user, doc->version, doc->type, doc->snapshot);
 }
 
+static void add_op_to_cache(ot_document *doc, void *op) {
+  size_t op_size = doc->type->op_size;
+  if (doc->op_cache_capacity == doc->version) {
+    doc->op_cache_capacity *= 2;
+    doc->op_cache = realloc(doc->op_cache, op_size * doc->op_cache_capacity);
+  }
+  memcpy(doc->op_cache + op_size * doc->version, op, op_size);
+}
+
 void db_apply_op(database *db, const sds doc_name, size_t version, void *op, size_t op_length,
    void *user, db_apply_cb callback) {
   assert(db);
@@ -129,11 +138,20 @@ void db_apply_op(database *db, const sds doc_name, size_t version, void *op, siz
   ot_op op_local;
   memcpy(&op_local, op, op_length);
   while (version < doc->version) {
-    doc->type->transform(&op_local, &op_local, doc->op_cache[version++], true);
+    doc->type->transform(&op_local, &op_local, doc->op_cache + op_length * version, true);
+    version++;
+  }
+  
+  if (doc->type->check(doc->snapshot, op)) {
+    if (callback) callback("Op invalid", user, 0);
+    return;
   }
   
   // Then apply it.
   doc->type->apply(doc->snapshot, &op_local);
+  
+  add_op_to_cache(doc, op);
+  
   doc->version++;
   
   if (callback) callback(NULL, user, doc->version);

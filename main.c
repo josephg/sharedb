@@ -77,7 +77,9 @@ int main(int argc, const char *argv[]) {
   
   text_op op = text_op_insert(0, (uint8_t *)"hi there");
   db_apply_op(&db, docName, 0, &op, sizeof(text_op), NULL, NULL);
-  
+
+  db_apply_op(&db, docName, 0, &op, sizeof(text_op), NULL, NULL);
+
   db_get(&db, docName, NULL, print_doc);
   
   
