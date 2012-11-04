@@ -91,4 +91,14 @@ typedef void (*db_apply_cb)(char *error, void *user, size_t newVersion);
 void db_apply_op(database *db, const sds doc_name, size_t version, void *op, size_t op_length,
                  void *user, db_apply_cb callback);
 
+/*
+// Valid errors:
+//  Forbidden
+//  Document does not exist
+//  Versions invalid
+typedef void (*db_get_ops_cb)(char *error, void *user);
+
+void db_get_ops(database *db, const sds doc_name, void *dest, size_t vstart, size_t vnum,
+                void *user, db_get_ops_cb callback);
+*/
 #endif

@@ -25,7 +25,7 @@ static void dict_sds_key_destructor(void *data, void *val) {
 }
 
 static void dict_val_destructor(void *data, void *obj) {
-  ot_document *doc = (ot_document *)data;
+  ot_document *doc = (ot_document *)obj;
   doc->type->free(doc->snapshot);
   free(doc);
 }
@@ -54,7 +54,7 @@ database *db_new() {
 void db_free(database *db) {
   dictRelease(db->docs);
   db->docs = NULL;
-  free(db);
+//  free(db);
 }
 
 void db_create(database *db, const sds doc_name, ot_type *type,
@@ -156,3 +156,4 @@ void db_apply_op(database *db, const sds doc_name, size_t version, void *op, siz
   
   if (callback) callback(NULL, user, doc->version);
 }
+

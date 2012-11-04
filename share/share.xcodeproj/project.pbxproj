@@ -16,6 +16,7 @@
 		FD62D8AF16466F3A00446259 /* db.c in Sources */ = {isa = PBXBuildFile; fileRef = FD62D8A916466F3A00446259 /* db.c */; };
 		FD62D8B016466F3A00446259 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = FD62D8AB16466F3A00446259 /* main.c */; };
 		FD62D8B116466F3A00446259 /* ot.c in Sources */ = {isa = PBXBuildFile; fileRef = FD62D8AC16466F3A00446259 /* ot.c */; };
+		FD62D8C916468DA800446259 /* net.c in Sources */ = {isa = PBXBuildFile; fileRef = FD62D8C816468DA800446259 /* net.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,6 +82,8 @@
 		FD62D8AC16466F3A00446259 /* ot.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = ot.c; path = ../ot.c; sourceTree = "<group>"; };
 		FD62D8AD16466F3A00446259 /* ot.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = ot.h; path = ../ot.h; sourceTree = "<group>"; };
 		FD62D8AE16466F3A00446259 /* share.1 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.man; name = share.1; path = /Users/josephg/src/share/share.1; sourceTree = "<absolute>"; };
+		FD62D8C716468DA300446259 /* net.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = net.h; sourceTree = "<group>"; };
+		FD62D8C816468DA800446259 /* net.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = net.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,6 +184,8 @@
 				FD62D8A916466F3A00446259 /* db.c */,
 				FD62D8AA16466F3A00446259 /* db.h */,
 				FD62D8AB16466F3A00446259 /* main.c */,
+				FD62D8C716468DA300446259 /* net.h */,
+				FD62D8C816468DA800446259 /* net.c */,
 				FD62D8AC16466F3A00446259 /* ot.c */,
 				FD62D8AD16466F3A00446259 /* ot.h */,
 				FD62D8AE16466F3A00446259 /* share.1 */,
@@ -268,6 +273,7 @@
 				FD62D8AF16466F3A00446259 /* db.c in Sources */,
 				FD62D8B016466F3A00446259 /* main.c in Sources */,
 				FD62D8B116466F3A00446259 /* ot.c in Sources */,
+				FD62D8C916468DA800446259 /* net.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
