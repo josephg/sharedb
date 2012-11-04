@@ -19,8 +19,8 @@ static void apply_tc(void *doc, void *op) {
   text_op_apply((rope *)doc, (text_op *)op);
 }
 
-static void transform_tc(void *op1, void *op2, bool isLeft) {
-  text_op_transform((text_op *)op1, (text_op *)op2, isLeft);
+static void transform_tc(ot_op *result_out, void *op1, void *op2, bool isLeft) {
+  result_out->text = text_op_transform((text_op *)op1, (text_op *)op2, isLeft);
 }
 
 /*
@@ -35,6 +35,7 @@ static void transform_tc(void *op1, void *op2, bool isLeft) {
  */
 const ot_type text_composable = {
   "text",
+  sizeof(text_op),
   
   create_tc, // Create
   free_tc,

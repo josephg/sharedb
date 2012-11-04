@@ -5,6 +5,7 @@
 #include "db.h"
 #include "ot.h"
 #include "rope.h"
+#include "text-composable.h"
 
 struct client {
   
@@ -73,6 +74,12 @@ int main(int argc, const char *argv[]) {
   sds docName = sdsnew("hi");
   db_create(&db, docName, &text_composable, NULL, NULL);
   db_get(&db, docName, NULL, print_doc);
+  
+  text_op op = text_op_insert(0, (uint8_t *)"hi there");
+  db_apply_op(&db, docName, 0, &op, sizeof(text_op), NULL, NULL);
+  
+  db_get(&db, docName, NULL, print_doc);
+  
   
   sdsfree(docName);
   

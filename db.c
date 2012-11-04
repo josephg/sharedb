@@ -57,43 +57,41 @@ void db_free(database *db) {
   free(db);
 }
 
-void db_create(database *db, const sds docName, ot_type *type,
+void db_create(database *db, const sds doc_name, ot_type *type,
     void *user, db_create_cb callback) {
   assert(db);
-  assert(docName);
+  assert(doc_name);
   assert(type);
-  dictEntry *entry = dictFind(db->docs, docName);
+  dictEntry *entry = dictFind(db->docs, doc_name);
   if (entry) {
-    if (callback) {
-      callback("Document already exists", user);
-    }
+    if (callback) callback("Document already exists", user);
   } else {
     // Create it.
     ot_document *doc = malloc(sizeof(ot_document));
     doc->type = type;
     doc->snapshot = type->create(),
     doc->version = 0;
-    dictAdd(db->docs, sdsdup(docName), doc);
-    if (callback) {
-      callback(NULL, user);
-    }
+    doc->op_cache_capacity = 100;
+    doc->op_cache = malloc(type->op_size * doc->op_cache_capacity);
+    
+    dictAdd(db->docs, sdsdup(doc_name), doc);
+    if (callback) callback(NULL, user);
   }
 }
 
-void db_delete(database *db, const sds docName, void *user, db_delete_cb callback) {
+void db_delete(database *db, const sds doc_name, void *user, db_delete_cb callback) {
   assert(db);
-  assert(docName);
-  int status = dictDelete(db->docs, docName);
-  if (callback) {
-    callback(status == DICT_ERR ? "Document does not exist" : NULL, user);
-  }
+  assert(doc_name);
+  int status = dictDelete(db->docs, doc_name);
+  if (callback) callback(status == DICT_ERR ? "Document does not exist" : NULL, user);
 }
 
-void db_get(database *db, const sds docName, void *user, db_get_cb callback) {
-  assert(docName);
+void db_get(database *db, const sds doc_name, void *user, db_get_cb callback) {
+  assert(db);
+  assert(doc_name);
   assert(callback);
   
-  dictEntry *entry = dictFind(db->docs, docName);
+  dictEntry *entry = dictFind(db->docs, doc_name);
   if (!entry) {
     callback("Document does not exist", user, 0, NULL, NULL);
     return;
@@ -103,6 +101,40 @@ void db_get(database *db, const sds docName, void *user, db_get_cb callback) {
   callback(NULL, user, doc->version, doc->type, doc->snapshot);
 }
 
-void db_apply_op(database *db, const sds docName) {
+void db_apply_op(database *db, const sds doc_name, size_t version, void *op, size_t op_length,
+   void *user, db_apply_cb callback) {
+  assert(db);
+  assert(doc_name);
+  assert(op);
   
+  dictEntry *entry = dictFind(db->docs, doc_name);
+  if (!entry) {
+    if (callback) callback("Document does not exist", user, 0);
+    return;
+  }
+  
+  ot_document *doc = dictGetVal(entry);
+  
+  if (op_length != doc->type->op_size) {
+    if (callback) callback("Op invalid", user, 0);
+    return;
+  }
+  
+  if (version > doc->version) {
+    if (callback) callback("Op at future version", user, 0);
+    return;
+  }
+  
+  // First, transform the op to be current.
+  ot_op op_local;
+  memcpy(&op_local, op, op_length);
+  while (version < doc->version) {
+    doc->type->transform(&op_local, &op_local, doc->op_cache[version++], true);
+  }
+  
+  // Then apply it.
+  doc->type->apply(doc->snapshot, &op_local);
+  doc->version++;
+  
+  if (callback) callback(NULL, user, doc->version);
 }
