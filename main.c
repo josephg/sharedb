@@ -37,11 +37,8 @@ int main(int argc, const char *argv[]) {
   db_get(&db, docName, NULL, print_doc);
   sdsfree(docName);
   
-  fflush(stdout);
-  
   uv_loop_t *loop = uv_default_loop();
-  net_listen(loop, 8766);
-  uv_run(loop);
+  net_listen(&db, loop, 8766);
   
   
   db_free(&db);
