@@ -90,29 +90,27 @@ static bool read_bytes(client *c, void *dest, size_t length) {
   if (c->num_bytes < length) return true;
   
   c->num_bytes -= length;
-  while (length) {
-    buffer *buf = c->first_buffer;
-    
-    assert(buf);
+
+  buffer *buf;
+  while (buf = c->first_buffer,
+         length && buf->used - c->offset <= length) {
+    // Not enough bytes in the current buffer. Consume the whole thing and move on.
     assert(buf->used > c->offset);
-    
-    if (buf->used - c->offset <= length) {
-      // Not enough bytes in the current buffer.
-      size_t s = buf->used - c->offset;
-      memcpy(dest, &buf->bytes[c->offset], s);
-      dest += s;
-      c->offset = 0;
-      c->first_buffer = buf->next;
-      if (c->first_buffer == NULL) {
-        c->last_buffer = NULL;
-      }
-      pool_free(buf);
-      length -= s;
-    } else {
-      memcpy(dest, &buf->bytes[c->offset], length);
-      c->offset += length;
-      length = 0;
+    size_t s = buf->used - c->offset;
+    memcpy(dest, &buf->bytes[c->offset], s);
+    dest += s;
+    c->offset = 0;
+    c->first_buffer = buf->next;
+    if (c->first_buffer == NULL) {
+      c->last_buffer = NULL;
     }
+    pool_free(buf);
+    length -= s;
+  }
+  
+  if (length) {
+    memcpy(dest, &buf->bytes[c->offset], length);
+    c->offset += length;
   }
   return false;
 }
@@ -170,6 +168,7 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
     }
     
     c->num_bytes += nread;
+//    printf("Read in %zd\n", nread);
     
     while(true) {
       if(c->packet_length == 0) {

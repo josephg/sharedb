@@ -6,4 +6,6 @@ client = net.connect 8766, ->
   b = new Buffer 5
   b.writeUInt32LE 1, 0
   b.writeUInt8 2, 4
-  client.write b
+  client.write b.slice 0, 3
+  process.nextTick ->
+    client.write b.slice 3
