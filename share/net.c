@@ -25,102 +25,61 @@ typedef struct {
 
 #pragma pack()
 
-
-typedef struct buffer_s {
-  struct buffer_s *next;
-  size_t capacity;
-  size_t used;
-  char bytes[];
-} buffer;
-
 typedef struct client_s {
   uv_tcp_t socket;
   
   // Stuff for framing network messages
-  buffer *first_buffer;
-  buffer *last_buffer;
   
-  int32_t offset; // Byte offset into the first buffer
-  int32_t num_bytes; // Number of pending bytes
-  
-  size_t packet_length; // Size of the next incoming packet
+  // A buffer for the incoming packet
+  uint32_t offset; // Where we're up to in the current packet (including the length)
+
+  uint32_t packet_length; // Size of the currently incoming packet.
+  char *packet; // The buffer has
+  size_t packet_capacity;
   
   database *db;
   
   struct client_s *next_client;
 } client;
 
-static buffer *buffer_pool = NULL;
-
-static void pool_free(buffer *buf) {
-  buf->next = buffer_pool;
-  buffer_pool = buf;
-}
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 static uv_buf_t alloc_buffer(uv_handle_t *handle, size_t suggested_size) {
-  // The buffer is preceeded by a next pointer.
-  assert(suggested_size > sizeof(buffer));
-  
-  buffer *b;
-  if (buffer_pool) {
-    b = buffer_pool;
-    buffer_pool = b->next;
-    b->next = NULL;
-//    b->used = 0;
+  // I'm cheating, and returning where I want the packet (or packet length) to be stored.
+
+  client *c = (client *)handle;
+  if (c->offset < 4) {
+    // Read in the packet length
+    return uv_buf_init((char *)&c->packet_length + c->offset, 4 - c->offset);
   } else {
-    b = (buffer *)malloc(suggested_size);
-    b->next = NULL;
-    b->capacity = suggested_size;
-    b->used = 0;
+    // Reading in the packet itself
+    size_t new_size = MAX(suggested_size, c->packet_length);
+    
+    if (new_size > 1000000) {
+      fprintf(stderr, "Warning: trying to allocate %zd\n", new_size);
+    }
+    // We might need to resize the packet...
+    if (c->packet_capacity < new_size) {
+      c->packet = realloc(c->packet, new_size);
+      c->packet_capacity = new_size;
+    }
+    
+    return uv_buf_init(c->packet + c->offset - 4, c->packet_length - c->offset + 4);
   }
-  return uv_buf_init(b->bytes, (unsigned int)suggested_size - sizeof(buffer));
 }
 
 static void close_handle(uv_handle_t *handle) {
   client *c = (client *)handle;
-
-  // Recycle the buffers.
-  if (c->last_buffer) {
-    c->last_buffer->next = buffer_pool;
-    buffer_pool = c->first_buffer;
-  }
-  
+  free(c->packet);
   free(c);
 }
 
-static bool read_bytes(client *c, void *dest, size_t length) {
-  if (c->num_bytes < length) return true;
-  
-  assert(c->num_bytes >= length);
-  c->num_bytes -= length;
-  
-  assert(c->first_buffer);
-
-  buffer *buf;
-  while (buf = c->first_buffer,
-         length && buf->used - c->offset <= length) {
-    // Not enough bytes in the current buffer. Consume the whole thing and move on.
-    assert(buf->used > c->offset);
-    size_t s = buf->used - c->offset;
-    if (dest) {
-      memcpy(dest, &buf->bytes[c->offset], s);
-      dest += s;
-    }
-    c->offset = 0;
-    c->first_buffer = buf->next;
-    if (c->first_buffer == NULL) {
-      c->last_buffer = NULL;
-    }
-    pool_free(buf);
-    length -= s;
+static bool read_bytes(void *dest, void *src, void *end, size_t length) {
+  if (length + src >= end) {
+    return true;
   }
   
-  if (length) {
-    if (dest) {
-      memcpy(dest, &buf->bytes[c->offset], length);
-    }
-    c->offset += length;
-  }
+  memcpy(dest, src, length);
   return false;
 }
 
@@ -129,9 +88,13 @@ static bool handle_packet(client *c) {
   // I don't know if this is the best way to do this. It would be nice to avoid extra memcpys,
   // although one large memcpy is cheaper than lots of small ones.
   bool error = false;
-  size_t expected_remaining_bytes = c->num_bytes - c->packet_length;
-  int type = 0;
-  error = error || read_bytes(c, &type, 1);
+  
+  char *data = c->packet;
+  // A pointer just past the end of the packet.
+  char *end = c->packet + c->packet_length;
+  
+  if (data == end) return true;
+  unsigned char type = *(data++);
   
   switch (type) {
     case MSG_OPEN:
@@ -145,10 +108,9 @@ static bool handle_packet(client *c) {
       error = true;
   }
   
-  if (c->num_bytes != expected_remaining_bytes) {
-    fprintf(stderr, "Invalid packet - %ld trailing bytes\n",
-            c->num_bytes - expected_remaining_bytes);
-    read_bytes(c, NULL, c->num_bytes - expected_remaining_bytes);
+  if (data != end) {
+    fprintf(stderr, "%ld trailing bytes\n", end - data);
+//    read_bytes(c, NULL, c->num_bytes - expected_remaining_bytes);
 //    return true;
   }
   
@@ -165,58 +127,34 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
       fprintf(stderr, "uv error %s: %s\n", uv_err_name(err), uv_strerror(err));
     }
     uv_close((uv_handle_t *)stream, close_handle);
-    
-    if (uv_buf.base) {
-      pool_free((buffer *)(uv_buf.base - sizeof(buffer)));
-    }
   } else if (nread > 0) {
     // We have new data. Add the buffer to the client's linked list of buffers and check to see
     // if we can parse a packet.
-    buffer *buf = (buffer *)(uv_buf.base - sizeof(buffer));
     client *c = (client *)stream;
-    buf->used = nread;
+    c->offset += nread;
     
-    if (c->first_buffer == NULL) {
-      c->first_buffer = c->last_buffer = buf;
-    } else {
-      c->last_buffer->next = buf;
-      c->last_buffer = buf;
+    if (c->offset == 4) {
+      // Finished reading in the packet length.
+      
+      // Big endian???
+      //c->packet_length = ntohl(c->packet_length);
     }
     
-    c->num_bytes += nread;
+    if (c->offset > 4) {
+      assert(c->offset - 4 <= c->packet_length);
+    }
+    
     printf("Read in %zd\n", nread);
     
-    // Try and parse any packets which are pending in the stream.
-    while(true) {
-      if(c->packet_length == 0) {
-        if (c->num_bytes < 4) {
-          break;
-        }
-        
-        // The bytes are already little endian.
-        read_bytes(c, &c->packet_length, 4);
-        //printf("read header %d\n", client->packetLength);
-        
-        if (c->packet_length == 0) {
-          // Invalid packet.
-          fprintf(stderr, "Invalid packet - packet length is 0\n");
-          uv_close((uv_handle_t *)c, close_handle);
-          return;
-        }
-      } else {
-        if (c->num_bytes < c->packet_length) {
-          break;
-        }
-        
-        // Read a packet.
-        if (handle_packet(c)) {
-          // Invalid packet.
-          fprintf(stderr, "Closing connection due to invalid packet\n");
-          uv_close((uv_handle_t *)c, close_handle);
-          return;
-        }
-        c->packet_length = 0;
+    if (c->offset == c->packet_length + 4) {
+      // Read a packet.
+      if (handle_packet(c)) {
+        // Invalid packet.
+        fprintf(stderr, "Closing connection due to invalid packet\n");
+        uv_close((uv_handle_t *)c, close_handle);
+        return;
       }
+      c->offset = 0;
     }
   }
 }
@@ -259,11 +197,4 @@ void net_listen(database *db, uv_loop_t *loop, int port) {
   uv_set_process_title("shared");
   
   uv_run(loop);
-  
-  buffer *next;
-  for (buffer *iter = buffer_pool; iter; iter = next) {
-    next = iter->next;
-    free(iter);
-  }
-  buffer_pool = NULL;
 }
