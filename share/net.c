@@ -6,24 +6,16 @@
 
 enum message_type {
   // Common
-  MSG_OP, MSG_CURSOR,
+  MSG_OP = 1, MSG_CURSOR,
   
   // Client -> server
   MSG_OPEN, MSG_CLOSE, MSG_GET_OPS,
   
   // Server -> client
   MSG_OP_APPLIED,
+  
+  MSG_FLAG_HAS_DOC_NAME = 0x80
 };
-
-#pragma pack(1)
-
-typedef struct {
-  uint32_t length;
-  uint8_t type;
-  uint8_t data[];
-} message;
-
-#pragma pack()
 
 typedef struct client_s {
   uv_tcp_t socket;
@@ -36,6 +28,11 @@ typedef struct client_s {
   uint32_t packet_length; // Size of the currently incoming packet.
   char *packet; // The buffer has
   size_t packet_capacity;
+  
+  // The name of the most recently accessed document. This is cached, so subsequent requests on
+  // the same document don't need the docname resent.
+  // It starts off as NULL.
+  sds doc_name;
   
   database *db;
   
@@ -83,6 +80,19 @@ static bool read_bytes(void *dest, void *src, void *end, size_t length) {
   return false;
 }
 
+static sds read_string(char **src, char *end) {
+  char *data = *src;
+  size_t len = strnlen(data, end - data);
+  if (len == end - data) {
+    fprintf(stderr, "Not enough bytes left for the string!\n");
+    return NULL;
+  } else {
+    sds str = sdsnewlen(data, len);
+    *src += len + 1; // Also skip the \0
+    return str;
+  }
+}
+
 // Handle a pending packet. There must be a packet's worth of buffers waiting in c.
 static bool handle_packet(client *c) {
   // I don't know if this is the best way to do this. It would be nice to avoid extra memcpys,
@@ -96,10 +106,31 @@ static bool handle_packet(client *c) {
   if (data == end) return true;
   unsigned char type = *(data++);
   
+  if (type & MSG_FLAG_HAS_DOC_NAME) {
+    if (c->doc_name) {
+      //sdsclear(c->doc_name);
+      // ... and sdscat. But I'm lazy for now.
+      
+      sdsfree(c->doc_name);
+    }
+    c->doc_name = read_string(&data, end);
+    if (c->doc_name == NULL) {
+      return true;
+    }
+  }
+  
+  type &= 0x7f;
+  
+  if (c->doc_name == NULL) {
+    fprintf(stderr, "Doc name not known\n");
+    return true;
+  }
+  
   switch (type) {
     case MSG_OPEN:
       printf("Open!\n");
-      
+
+      printf("Docname is '%s'\n", c->doc_name);
       break;
       
     default:
