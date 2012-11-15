@@ -57,7 +57,7 @@ typedef void (*db_create_cb)(char *error, void *user);
 // Create a new document with the specified name and type.
 // Calls callback when complete.
 // TODO: use opt_load_initial_content.
-void db_create(database *db, const sds doc_name, ot_type *type, void *user, db_create_cb callback);
+void db_create(database *db, const char *doc_name, ot_type *type, void *user, db_create_cb callback);
 
 
 // Valid errors:

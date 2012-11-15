@@ -13,6 +13,10 @@ static unsigned int dict_sds_hash(const void *key) {
   return dictGenHashFunction((unsigned char*)key, (int)sdslen((char*)key));
 }
 
+static void *dict_sds_dup(void *data, const void *key) {
+  return sdsdup((const sds)key);
+}
+
 static int dict_sds_key_compare(void *data, const void *key1, const void *key2) {
   size_t l1 = sdslen((sds)key1);
   size_t l2 = sdslen((sds)key2);
@@ -33,7 +37,7 @@ static void dict_val_destructor(void *data, void *obj) {
 /* Db->document, keys are sds strings, vals are Redis objects. */
 dictType db_dict_type = {
   dict_sds_hash,                /* hash function */
-  NULL,                       /* key dup */
+  dict_sds_dup,                       /* key dup */
   NULL,                       /* val dup */
   dict_sds_key_compare,          /* key compare */
   dict_sds_key_destructor,          /* key destructor */
@@ -57,7 +61,7 @@ void db_free(database *db) {
 //  free(db);
 }
 
-void db_create(database *db, const sds doc_name, ot_type *type,
+void db_create(database *db, const char *doc_name, ot_type *type,
     void *user, db_create_cb callback) {
   assert(db);
   assert(doc_name);
@@ -74,7 +78,7 @@ void db_create(database *db, const sds doc_name, ot_type *type,
     doc->op_cache_capacity = 100;
     doc->op_cache = malloc(type->op_size * doc->op_cache_capacity);
     
-    dictAdd(db->docs, sdsdup(doc_name), doc);
+    dictAdd(db->docs, (void *)doc_name, doc);
     if (callback) callback(NULL, user);
   }
 }

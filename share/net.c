@@ -65,9 +65,11 @@ static uv_buf_t alloc_buffer(uv_handle_t *handle, size_t suggested_size) {
   if (buffer_pool) {
     b = buffer_pool;
     buffer_pool = b->next;
+    b->next = NULL;
+//    b->used = 0;
   } else {
     b = (buffer *)malloc(suggested_size);
-    b->next = 0;
+    b->next = NULL;
     b->capacity = suggested_size;
     b->used = 0;
   }
@@ -89,7 +91,10 @@ static void close_handle(uv_handle_t *handle) {
 static bool read_bytes(client *c, void *dest, size_t length) {
   if (c->num_bytes < length) return true;
   
+  assert(c->num_bytes >= length);
   c->num_bytes -= length;
+  
+  assert(c->first_buffer);
 
   buffer *buf;
   while (buf = c->first_buffer,
@@ -97,8 +102,10 @@ static bool read_bytes(client *c, void *dest, size_t length) {
     // Not enough bytes in the current buffer. Consume the whole thing and move on.
     assert(buf->used > c->offset);
     size_t s = buf->used - c->offset;
-    memcpy(dest, &buf->bytes[c->offset], s);
-    dest += s;
+    if (dest) {
+      memcpy(dest, &buf->bytes[c->offset], s);
+      dest += s;
+    }
     c->offset = 0;
     c->first_buffer = buf->next;
     if (c->first_buffer == NULL) {
@@ -109,38 +116,46 @@ static bool read_bytes(client *c, void *dest, size_t length) {
   }
   
   if (length) {
-    memcpy(dest, &buf->bytes[c->offset], length);
+    if (dest) {
+      memcpy(dest, &buf->bytes[c->offset], length);
+    }
     c->offset += length;
   }
   return false;
 }
 
+// Handle a pending packet. There must be a packet's worth of buffers waiting in c.
 static bool handle_packet(client *c) {
-  uint8_t packet_type;
+  // I don't know if this is the best way to do this. It would be nice to avoid extra memcpys,
+  // although one large memcpy is cheaper than lots of small ones.
+  bool error = false;
   size_t expected_remaining_bytes = c->num_bytes - c->packet_length;
+  int type = 0;
+  error = error || read_bytes(c, &type, 1);
   
-  if (read_bytes(c, &packet_type, 1)) return true;
-  
-  switch (packet_type) {
+  switch (type) {
     case MSG_OPEN:
       printf("Open!\n");
+      
       break;
       
     default:
       // Invalid data.
-      fprintf(stderr, "Invalid packet - unexpected type %d\n", packet_type);
-      return true;
+      fprintf(stderr, "Invalid packet - unexpected type %d\n", type);
+      error = true;
   }
   
   if (c->num_bytes != expected_remaining_bytes) {
     fprintf(stderr, "Invalid packet - %ld trailing bytes\n",
             c->num_bytes - expected_remaining_bytes);
-    return true;
+    read_bytes(c, NULL, c->num_bytes - expected_remaining_bytes);
+//    return true;
   }
   
-  return false;
+  return error;
 }
 
+// libuv callback for incoming network data.
 static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
   if (nread < 0) {
     // An error occurred on the stream. Punt 'em.
@@ -155,7 +170,8 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
       pool_free((buffer *)(uv_buf.base - sizeof(buffer)));
     }
   } else if (nread > 0) {
-    // We have new data.
+    // We have new data. Add the buffer to the client's linked list of buffers and check to see
+    // if we can parse a packet.
     buffer *buf = (buffer *)(uv_buf.base - sizeof(buffer));
     client *c = (client *)stream;
     buf->used = nread;
@@ -168,8 +184,9 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
     }
     
     c->num_bytes += nread;
-//    printf("Read in %zd\n", nread);
+    printf("Read in %zd\n", nread);
     
+    // Try and parse any packets which are pending in the stream.
     while(true) {
       if(c->packet_length == 0) {
         if (c->num_bytes < 4) {
@@ -204,6 +221,7 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
   }
 }
 
+// Callback for libuv's uv_listen(server, ...) method.
 static void got_connection(uv_stream_t* server, int status) {
   printf("got connection\n");
   

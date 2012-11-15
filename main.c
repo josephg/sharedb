@@ -40,7 +40,6 @@ int main(int argc, const char *argv[]) {
   uv_loop_t *loop = uv_default_loop();
   net_listen(&db, loop, 8766);
   
-  
   db_free(&db);
 }
 
