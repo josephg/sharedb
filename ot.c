@@ -23,6 +23,10 @@ static void transform_tc(ot_op *result_out, void *op1, void *op2, bool isLeft) {
   result_out->text = text_op_transform((text_op *)op1, (text_op *)op2, isLeft);
 }
 
+static void read_op(ot_op *result_out, void *data, size_t length) {
+  text_op_from_bytes(&result_out->text, data, length);
+}
+
 /*
  typedef struct {
  void *(*create)();

@@ -2,6 +2,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#ifdef __BLOCKS__
+#include <Block.h>
+#endif
 
 /*
 static ot_document doc_add(database *db, char *name, ot_type *type, void *initial_data) {
@@ -61,6 +64,19 @@ void db_free(database *db) {
 //  free(db);
 }
 
+void doc_retain(ot_document *doc) {
+  doc->retain_count++;
+}
+
+void doc_release(ot_document *doc) {
+  assert(doc->retain_count);
+  doc->retain_count--;
+  
+  if (doc->retain_count == 0) {
+    // ... Set a timeout to reap the document.
+  }
+}
+
 void db_create(database *db, const char *doc_name, ot_type *type,
     void *user, db_create_cb callback) {
   assert(db);
@@ -68,7 +84,7 @@ void db_create(database *db, const char *doc_name, ot_type *type,
   assert(type);
   dictEntry *entry = dictFind(db->docs, doc_name);
   if (entry) {
-    if (callback) callback("Document already exists", user);
+    if (callback) callback("Document already exists", dictGetVal(entry), user);
   } else {
     // Create it.
     ot_document *doc = malloc(sizeof(ot_document));
@@ -77,9 +93,11 @@ void db_create(database *db, const char *doc_name, ot_type *type,
     doc->version = 0;
     doc->op_cache_capacity = 100;
     doc->op_cache = malloc(type->op_size * doc->op_cache_capacity);
+    doc->retain_count = 0;
+    doc->open_pair_head = NULL;
     
     dictAdd(db->docs, (void *)doc_name, doc);
-    if (callback) callback(NULL, user);
+    if (callback) callback(NULL, doc, user);
   }
 }
 
@@ -87,8 +105,10 @@ void db_delete(database *db, const sds doc_name, void *user, db_delete_cb callba
   assert(db);
   assert(doc_name);
   int status = dictDelete(db->docs, doc_name);
-  if (callback) callback(status == DICT_ERR ? "Document does not exist" : NULL, user);
+  if (callback) callback(status == DICT_ERR ? "Doc does not exist" : NULL, user);
 }
+
+typedef float V __attribute__(( vector_size(16) ));
 
 void db_get(database *db, const sds doc_name, void *user, db_get_cb callback) {
   assert(db);
@@ -97,12 +117,22 @@ void db_get(database *db, const sds doc_name, void *user, db_get_cb callback) {
   
   dictEntry *entry = dictFind(db->docs, doc_name);
   if (!entry) {
-    callback("Document does not exist", user, 0, NULL, NULL);
+    callback("Doc does not exist", user, NULL);
     return;
   }
   
   ot_document *doc = dictGetVal(entry);
-  callback(NULL, user, doc->version, doc->type, doc->snapshot);
+  callback(NULL, user, doc);
+}
+
+static void _db_get_b_cb(char *error, void *user, ot_document *doc) {
+  db_get_cb_b cb = (db_get_cb_b)user;
+  cb(error, doc);
+  Block_release(cb);
+}
+
+void db_get_b(database *db, const sds doc_name, db_get_cb_b callback) {
+  db_get(db, doc_name, (void *)Block_copy(callback), _db_get_b_cb);
 }
 
 static void add_op_to_cache(ot_document *doc, void *op) {
@@ -122,7 +152,7 @@ void db_apply_op(database *db, const sds doc_name, size_t version, void *op, siz
   
   dictEntry *entry = dictFind(db->docs, doc_name);
   if (!entry) {
-    if (callback) callback("Document does not exist", user, 0);
+    if (callback) callback("Doc does not exist", user, 0);
     return;
   }
   

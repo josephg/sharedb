@@ -4,10 +4,13 @@
 #include "ot.h"
 #include "dict.h"
 #include "sds.h"
+#include "net.h"
+
+struct client_t;
 
 typedef void (*db_load_content_cb)(void *content, void *ctx);
 
-typedef struct {
+typedef struct database_t {
   // Optional function which initializes document's content based on its document name.
   // If this function returns NULL, a new document is created if opt_auto_create is set.
   void (*opt_load_initial_content)(char *doc_name, ot_type *type, void *ctx, db_load_content_cb);
@@ -21,14 +24,21 @@ typedef struct {
 } database;
 
 
-typedef struct {
+
+
+typedef struct ot_document_t {
   const ot_type *type;
   
   void *snapshot;
   size_t version;
   
-  void *op_cache;
   size_t op_cache_capacity;
+  void *op_cache;
+  
+  int retain_count;
+  
+  open_pair *open_pair_head;
+  
   // op cache
   // metadata
   
@@ -40,6 +50,7 @@ typedef struct {
   // bool snapshot_write_lock;
   
   // void *db_meta;
+  
 } ot_document;
 
 
@@ -47,17 +58,26 @@ database *db_init(database *db);
 database *db_new();
 void db_free(database *db);
 
+void doc_retain(ot_document *doc);
+void doc_release(ot_document *doc);
+
+// Create a document. The document is only created if it doesn't already exist. The document
+// is returned through the callback. Retain the document if you want to keep it.
+//
+// If the document already exists, it _may_ be passed through the callback. (It is right now, but
+// this behaviour may change in future versions).
+//
 // Error is null if the create operation was successful.
 // Valid errors:
 //  Forbidden
 //  Document already exists
 //  Invalid document name
-typedef void (*db_create_cb)(char *error, void *user);
+typedef void (*db_create_cb)(char *error, ot_document *doc, void *user);
 
 // Create a new document with the specified name and type.
 // Calls callback when complete.
 // TODO: use opt_load_initial_content.
-void db_create(database *db, const char *doc_name, ot_type *type, void *user, db_create_cb callback);
+void db_create(database *, const char *doc_name, ot_type *, void *user, db_create_cb callback);
 
 
 // Valid errors:
@@ -72,11 +92,17 @@ void db_delete(database *db, const sds doc_name, void *user, db_delete_cb callba
 // Valid errors:
 //  Forbidden
 //  Document does not exist
-typedef void (*db_get_cb)(char *error, void *user, size_t version, ot_type *type, void *data);
+typedef void (*db_get_cb)(char *error, void *user, ot_document *doc);
 
-// Get the specified document. Returned via callback.
+// Get the specified document. Returned via callback. Retain the document if you need it beyond the
+// call stack.
 void db_get(database *db, const sds doc_name, void *user, db_get_cb callback);
 
+#ifdef __BLOCKS__
+typedef void (^db_get_cb_b)(char *error, ot_document *doc);
+// Version of db_get which uses blocks.
+void db_get_b(database *db, const sds doc_name, db_get_cb_b callback);
+#endif
 
 // Valid errors:
 //  Forbidden
@@ -101,4 +127,5 @@ typedef void (*db_get_ops_cb)(char *error, void *user);
 void db_get_ops(database *db, const sds doc_name, void *dest, size_t vstart, size_t vnum,
                 void *user, db_get_ops_cb callback);
 */
+
 #endif

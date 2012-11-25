@@ -1,3 +1,4 @@
+#include "net.h"
 #include "db.h"
 #include "uv.h"
 #include <stdlib.h>
@@ -6,18 +7,21 @@
 
 enum message_type {
   // Common
-  MSG_OP = 1, MSG_CURSOR,
+  MSG_OP = 1,
+  MSG_CURSOR = 2,
   
   // Client -> server
-  MSG_OPEN, MSG_CLOSE, MSG_GET_OPS,
+  MSG_OPEN = 3,
+  MSG_CLOSE = 4,
+  MSG_GET_OPS = 5,
   
   // Server -> client
-  MSG_OP_APPLIED,
+  MSG_OP_APPLIED = 6,
   
   MSG_FLAG_HAS_DOC_NAME = 0x80
 };
 
-typedef struct client_s {
+typedef struct client_t {
   uv_tcp_t socket;
   
   // Stuff for framing network messages
@@ -36,7 +40,13 @@ typedef struct client_s {
   
   database *db;
   
-  struct client_s *next_client;
+  struct client_t *next_client;
+
+  open_pair *open_docs_head;
+//  // This is a bag of pointers to clients who have the document open.
+//  sds *open_doc_names;
+//  int num_open_docs;
+//  int open_doc_capacity;
 } client;
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
@@ -93,6 +103,45 @@ static sds read_string(char **src, char *end) {
   }
 }
 
+static open_pair *open_pair_alloc() {
+  return malloc(sizeof(open_pair *));
+}
+
+// It might make more sense to put this function into db.h.
+static void open_doc(client *client, sds doc_name, void (^callback)(char *error)) {
+  printf("Open '%s'\n", doc_name);
+  
+  db_get_b(client->db, doc_name, ^(char *error, ot_document *doc) {
+    if (error) {
+      if (callback) callback(error);
+      return;
+    }
+    
+    // First make sure the doc isn't already open.
+    for (open_pair *o = client->open_docs_head; o; o = o->next) {
+      if (o->doc == doc) {
+        if (callback) callback("Doc is already open");
+        return;
+      }
+    }
+    
+    // The document isn't open. Open it.
+    open_pair *pair = open_pair_alloc();
+    pair->client = client;
+    pair->doc = doc;
+    pair->next = client->open_docs_head;
+    client->open_docs_head = pair;
+    
+    pair->next_client = doc->open_pair_head;
+    pair->prev_client = NULL;
+    doc->open_pair_head = pair;
+    
+    if (callback) callback(NULL);
+  });
+}
+
+#define READ_INT32(dest) if(end - data < 4) return false; dest = *(int *)data; data += 4
+
 // Handle a pending packet. There must be a packet's worth of buffers waiting in c.
 static bool handle_packet(client *c) {
   // I don't know if this is the best way to do this. It would be nice to avoid extra memcpys,
@@ -128,9 +177,20 @@ static bool handle_packet(client *c) {
   
   switch (type) {
     case MSG_OPEN:
-      printf("Open!\n");
-
-      printf("Docname is '%s'\n", c->doc_name);
+      //open_doc(c, c->doc_name);
+      break;
+      
+    case MSG_OP:
+      // Packet contents:
+      // - Version
+      // - Op. Op data is specific to the OT type.
+      // Not implemented: dupIfSource
+      if (c->doc_name == NULL) return true;
+      uint32_t version;
+      READ_INT32(version);
+      ot_op op;
+      
+      
       break;
       
     default:

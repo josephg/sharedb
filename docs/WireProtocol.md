@@ -6,7 +6,7 @@ The wire protocol is loosely based on [ShareJS's wire protocol](https://github.c
 
 The server listens for incoming TCP connections on port 8766. (liable to change).
 
-All integers are transmitted using little endian. All strings are sent in UTF-8 and null terminated.
+All integers are transmitted using little endian. All strings are sent as null terminated UTF-8.
 
 The server and client exchange a series of messages over this connection. Each message starts with:
 
@@ -23,3 +23,20 @@ The server and client exchange a series of messages over this connection. Each m
 - **Cursor**: Move the user's cursor to the specified position
 - **Get Ops**: Get historical operations for the specified document
 - **Snapshot**: Get a snapshot of the document at its current version
+
+
+### Open
+
+The open message requests that the server stream the client any operations applied to a document. The server only sends operations applied to the document by other clients. An open document can be closed using the `close` message.
+
+An open request can come in 2 different forms:
+
+- Open a document at a specified version. This is used when you have a cached document snapshot and want to reopen the document. All operations applied since the specified version are sent to the client immediately.
+- Send the client a document snapshot, and open a document at the version specified by the snapshot. This is the equivalent of sending a snapshot request, then opening the document at the snapshot's version.
+
+Open requests can also be combined with `create` messages. In this case, the server will automatically create the document if it does not exist. In this case, the type must be specified.
+
+Errors:
+
+- __Doc does not exist__
+- __Doc already open__: The document has already been opened.
