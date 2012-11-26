@@ -50,7 +50,7 @@ typedef struct client_t {
 } client;
 
 static open_pair *open_pair_alloc() {
-  return malloc(sizeof(open_pair *));
+  return malloc(sizeof(open_pair));
 }
 
 static void open_pair_free(open_pair *pair) {
@@ -178,6 +178,9 @@ static void open_doc(client *client, sds doc_name, void (^callback)(char *error)
     client->open_docs_head = pair;
     
     pair->next_client = doc->open_pair_head;
+    if (pair->next_client) {
+      pair->next_client->prev_client = pair;
+    }
     pair->prev_client = NULL;
     doc->open_pair_head = pair;
     
@@ -187,6 +190,8 @@ static void open_doc(client *client, sds doc_name, void (^callback)(char *error)
 }
 
 #define READ_INT32(dest) if(end - data < 4) return false; dest = *(int *)data; data += 4
+
+void print_doc(ot_document *doc);
 
 // Handle a pending packet. There must be a packet's worth of buffers waiting in c.
 static bool handle_packet(client *c) {
@@ -245,6 +250,7 @@ static bool handle_packet(client *c) {
       size_t op_size = end - data;
       char op_buffer[op_size];
       memcpy(op_buffer, data, op_size);
+      data = end;
       // I don't know why I need to do this, or if there are dragons involved.
       char *b = op_buffer;
       
@@ -263,6 +269,8 @@ static bool handle_packet(client *c) {
         
         db_apply_op_b(c->db, doc, version, &op, ^(char *error, size_t new_v) {
           printf("Op applied.. error: '%s', new version %ld\n", error, new_v);
+          
+          print_doc(doc);
         });
       });
       
