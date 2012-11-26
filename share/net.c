@@ -43,11 +43,56 @@ typedef struct client_t {
   struct client_t *next_client;
 
   open_pair *open_docs_head;
-//  // This is a bag of pointers to clients who have the document open.
-//  sds *open_doc_names;
-//  int num_open_docs;
-//  int open_doc_capacity;
+
+  // The retain count starts at 1, which means the client is connected. The client is freed when
+  // the retain count gets to 0.
+  int retain_count;
 } client;
+
+static open_pair *open_pair_alloc() {
+  return malloc(sizeof(open_pair *));
+}
+
+static void open_pair_free(open_pair *pair) {
+  // Change me to use an object pool.
+  free(pair);
+}
+
+static inline void client_retain(client *client) {
+  client->retain_count++;
+}
+
+static void close_pair(open_pair *pair) {
+  if (pair->prev_client) {
+    pair->prev_client->next_client = pair->next_client;
+  } else {
+    // The node is the doc's head node
+    assert(pair == pair->doc->open_pair_head);
+    pair->doc->open_pair_head = pair->next_client;
+  }
+  if (pair->next_client) {
+    pair->next_client->prev_client = pair->prev_client;
+  }
+  // & probably refresh the document's reaping timeout.
+  open_pair_free(pair);
+}
+
+static void client_release(client *client) {
+  client->retain_count--;
+  if (client->retain_count == 0) {
+    assert(!uv_is_active((uv_handle_t *)client));
+    
+    // Close all the documents the client still has open
+    for (open_pair *o = client->open_docs_head; o;) {
+      open_pair *prev = o;
+      o = o->next;
+      close_pair(prev);
+    }
+    
+    free(client->packet);
+    free(client);
+  }
+}
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
@@ -75,10 +120,10 @@ static uv_buf_t alloc_buffer(uv_handle_t *handle, size_t suggested_size) {
   }
 }
 
-static void close_handle(uv_handle_t *handle) {
+// This is called after uv closes a client's handle.
+static void close_handle_cb(uv_handle_t *handle) {
   client *c = (client *)handle;
-  free(c->packet);
-  free(c);
+  client_release(c);
 }
 
 static bool read_bytes(void *dest, void *src, void *end, size_t length) {
@@ -103,17 +148,16 @@ static sds read_string(char **src, char *end) {
   }
 }
 
-static open_pair *open_pair_alloc() {
-  return malloc(sizeof(open_pair *));
-}
-
 // It might make more sense to put this function into db.h.
 static void open_doc(client *client, sds doc_name, void (^callback)(char *error)) {
   printf("Open '%s'\n", doc_name);
+  client_retain(client);
   
   db_get_b(client->db, doc_name, ^(char *error, ot_document *doc) {
+    // doc_name may have been freed by this point.
     if (error) {
       if (callback) callback(error);
+      client_release(client);
       return;
     }
     
@@ -121,6 +165,7 @@ static void open_doc(client *client, sds doc_name, void (^callback)(char *error)
     for (open_pair *o = client->open_docs_head; o; o = o->next) {
       if (o->doc == doc) {
         if (callback) callback("Doc is already open");
+        client_release(client);
         return;
       }
     }
@@ -137,6 +182,7 @@ static void open_doc(client *client, sds doc_name, void (^callback)(char *error)
     doc->open_pair_head = pair;
     
     if (callback) callback(NULL);
+    client_release(client);
   });
 }
 
@@ -177,7 +223,12 @@ static bool handle_packet(client *c) {
   
   switch (type) {
     case MSG_OPEN:
-      //open_doc(c, c->doc_name);
+      open_doc(c, c->doc_name, ^(char *error) {
+        printf("Open callback - error: '%s'\n", error);
+        
+        // ... Reply to the client.
+        
+      });
       break;
       
     case MSG_OP:
@@ -188,7 +239,7 @@ static bool handle_packet(client *c) {
       if (c->doc_name == NULL) return true;
       uint32_t version;
       READ_INT32(version);
-      ot_op op;
+      //ot_op op;
       
       
       break;
@@ -217,7 +268,7 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
     if (err.code != UV_EOF) {
       fprintf(stderr, "uv error %s: %s\n", uv_err_name(err), uv_strerror(err));
     }
-    uv_close((uv_handle_t *)stream, close_handle);
+    uv_close((uv_handle_t *)stream, close_handle_cb);
   } else if (nread > 0) {
     // We have new data. Add the buffer to the client's linked list of buffers and check to see
     // if we can parse a packet.
@@ -242,7 +293,7 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
       if (handle_packet(c)) {
         // Invalid packet.
         fprintf(stderr, "Closing connection due to invalid packet\n");
-        uv_close((uv_handle_t *)c, close_handle);
+        uv_close((uv_handle_t *)c, close_handle_cb);
         return;
       }
       c->offset = 0;
@@ -262,12 +313,10 @@ static void got_connection(uv_stream_t* server, int status) {
   client *c = calloc(sizeof(client), 1);
   uv_tcp_init(uv_default_loop(), &c->socket);
   c->db = (database *)server->data;
-  
-  if (uv_accept(server, (uv_stream_t *)&c->socket)) {
-    uv_close((uv_handle_t *)&c->socket, NULL);
-    free(c);
-    return;
-  }
+  c->retain_count = 1;
+
+  // uv_accept is guaranteed to succeed here.
+  assert(uv_accept(server, (uv_stream_t *)&c->socket) == 0);
   
   uv_read_start((uv_stream_t *)&c->socket, alloc_buffer, got_data);
 }
