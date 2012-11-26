@@ -11,20 +11,20 @@ static void free_tc(void *doc) {
   rope_free((rope *)doc);
 }
 
-static int check_tc(void *doc, void *op) {
-  return text_op_check((rope *)doc, (text_op *)op);
+static ssize_t read_tc(ot_op *result_out, void *data, size_t length) {
+  return text_op_from_bytes(&result_out->text, data, length);
 }
 
-static void apply_tc(void *doc, void *op) {
-  text_op_apply((rope *)doc, (text_op *)op);
+static int check_tc(void *doc, const ot_op *op) {
+  return text_op_check((rope *)doc, &op->text);
 }
 
-static void transform_tc(ot_op *result_out, void *op1, void *op2, bool isLeft) {
-  result_out->text = text_op_transform((text_op *)op1, (text_op *)op2, isLeft);
+static void apply_tc(void *doc, ot_op *op) {
+  text_op_apply((rope *)doc, &op->text);
 }
 
-static void read_op(ot_op *result_out, void *data, size_t length) {
-  text_op_from_bytes(&result_out->text, data, length);
+static void transform_tc(ot_op *result_out, ot_op *op1, ot_op *op2, bool isLeft) {
+  result_out->text = text_op_transform(&op1->text, &op2->text, isLeft);
 }
 
 /*
@@ -43,6 +43,7 @@ const ot_type text_composable = {
   
   create_tc, // Create
   free_tc,
+  read_tc,
   
   check_tc,
   apply_tc,

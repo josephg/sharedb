@@ -125,17 +125,19 @@ void db_get(database *db, const sds doc_name, void *user, db_get_cb callback) {
   callback(NULL, user, doc);
 }
 
+#ifdef __BLOCKS__
 static void _db_get_b_cb(char *error, void *user, ot_document *doc) {
-  db_get_cb_b cb = (db_get_cb_b)user;
+  db_get_bcb cb = (db_get_bcb)user;
   cb(error, doc);
   Block_release(cb);
 }
 
-void db_get_b(database *db, const sds doc_name, db_get_cb_b callback) {
+void db_get_b(database *db, const sds doc_name, db_get_bcb callback) {
   db_get(db, doc_name, (void *)Block_copy(callback), _db_get_b_cb);
 }
+#endif
 
-static void add_op_to_cache(ot_document *doc, void *op) {
+static void add_op_to_cache(ot_document *doc, ot_op *op) {
   size_t op_size = doc->type->op_size;
   if (doc->op_cache_capacity == doc->version) {
     doc->op_cache_capacity *= 2;
@@ -144,24 +146,11 @@ static void add_op_to_cache(ot_document *doc, void *op) {
   memcpy(doc->op_cache + op_size * doc->version, op, op_size);
 }
 
-void db_apply_op(database *db, const sds doc_name, size_t version, void *op, size_t op_length,
+void db_apply_op(const database *db, ot_document *doc, size_t version, const ot_op *op,
    void *user, db_apply_cb callback) {
   assert(db);
-  assert(doc_name);
+  assert(doc);
   assert(op);
-  
-  dictEntry *entry = dictFind(db->docs, doc_name);
-  if (!entry) {
-    if (callback) callback("Doc does not exist", user, 0);
-    return;
-  }
-  
-  ot_document *doc = dictGetVal(entry);
-  
-  if (op_length != doc->type->op_size) {
-    if (callback) callback("Op invalid", user, 0);
-    return;
-  }
   
   if (version > doc->version) {
     if (callback) callback("Op at future version", user, 0);
@@ -169,10 +158,10 @@ void db_apply_op(database *db, const sds doc_name, size_t version, void *op, siz
   }
   
   // First, transform the op to be current.
-  ot_op op_local;
-  memcpy(&op_local, op, op_length);
+  ot_op op_local = *op;
   while (version < doc->version) {
-    doc->type->transform(&op_local, &op_local, doc->op_cache + op_length * version, true);
+    ot_op *other = (ot_op *)(doc->op_cache + doc->type->op_size * version);
+    doc->type->transform(&op_local, &op_local, other, true);
     version++;
   }
   
@@ -184,10 +173,22 @@ void db_apply_op(database *db, const sds doc_name, size_t version, void *op, siz
   // Then apply it.
   doc->type->apply(doc->snapshot, &op_local);
   
-  add_op_to_cache(doc, op);
+  add_op_to_cache(doc, &op_local);
   
   doc->version++;
   
   if (callback) callback(NULL, user, doc->version);
 }
 
+#ifdef __BLOCKS__
+static void _apply_op_b_cb(char *error, void *user, size_t new_version) {
+  db_apply_bcb cb = (db_apply_bcb)user;
+  cb(error, new_version);
+  Block_release(cb);
+}
+
+void db_apply_op_b(const database *db, ot_document *doc, size_t version, const ot_op *op,
+                   db_apply_bcb callback) {
+  db_apply_op(db, doc, version, op, (void *)Block_copy(callback), _apply_op_b_cb);
+}
+#endif

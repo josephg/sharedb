@@ -231,7 +231,7 @@ static bool handle_packet(client *c) {
       });
       break;
       
-    case MSG_OP:
+    case MSG_OP: {
       // Packet contents:
       // - Version
       // - Op. Op data is specific to the OT type.
@@ -239,10 +239,36 @@ static bool handle_packet(client *c) {
       if (c->doc_name == NULL) return true;
       uint32_t version;
       READ_INT32(version);
-      //ot_op op;
+      // Inside the block below, the packet data won't be valid anymore. I'll copy it to a local
+      // buffer and then parse it.
+      // This won't work with VSC - but thats a bridge to cross when we get to it.
+      size_t op_size = end - data;
+      char op_buffer[op_size];
+      memcpy(op_buffer, data, op_size);
+      // I don't know why I need to do this, or if there are dragons involved.
+      char *b = op_buffer;
+      
+      db_get_b(c->db, c->doc_name, ^(char *error, ot_document *doc) {
+        if (error) {
+          // ... Pass the error back to the client.
+          return;
+        }
+        ot_op op;
+        ssize_t bytes_read = doc->type->read(&op, b, op_size);
+        if (bytes_read < 0) {
+          // Error parsing the op.
+          fprintf(stderr, "Error parsing op");
+          return;
+        }
+        
+        db_apply_op_b(c->db, doc, version, &op, ^(char *error, size_t new_v) {
+          printf("Op applied.. error: '%s', new version %ld\n", error, new_v);
+        });
+      });
       
       
       break;
+    }
       
     default:
       // Invalid data.

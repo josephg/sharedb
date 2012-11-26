@@ -8,16 +8,12 @@
 #include "text-composable.h"
 #include "net.h"
 
-void print_doc(char *error, void *user, ot_document *doc) {
-  if (error) {
-    printf("Error: %s\n", error);
-  } else {
-    printf("Version: %zd, type: %s\n", doc->version, doc->type->name);
-    if (doc->type == &text_composable) {
-      unsigned char *str = rope_createcstr((rope *)doc->snapshot, NULL);
-      printf("Contents: '%s'\n", str);
-      free(str);
-    }
+void print_doc(ot_document *doc) {
+  printf("Version: %zd, type: %s\n", doc->version, doc->type->name);
+  if (doc->type == &text_composable) {
+    unsigned char *str = rope_createcstr((rope *)doc->snapshot, NULL);
+    printf("Contents: '%s'\n", str);
+    free(str);
   }
 }
 
@@ -28,13 +24,19 @@ int main(int argc, const char *argv[]) {
   
   sds docName = sdsnew("hi");
   db_create(&db, docName, &text_composable, NULL, NULL);
-  db_get(&db, docName, NULL, print_doc);
+  db_get_b(&db, docName, ^(char *error, ot_document *doc) {
+    if (error) {
+      printf("Error getting document: %s\n", error);
+      return;
+    }
+    print_doc(doc);
+    
+    text_op op = text_op_insert(0, (uint8_t *)"hi there");
+    db_apply_op(&db, doc, 0, (ot_op *)&op, NULL, NULL);
+    db_apply_op(&db, doc, 0, (ot_op *)&op, NULL, NULL);
+    print_doc(doc);
+  });
   
-  text_op op = text_op_insert(0, (uint8_t *)"hi there");
-  db_apply_op(&db, docName, 0, &op, sizeof(text_op), NULL, NULL);
-  db_apply_op(&db, docName, 0, &op, sizeof(text_op), NULL, NULL);
-
-  db_get(&db, docName, NULL, print_doc);
   sdsfree(docName);
   
   uv_loop_t *loop = uv_default_loop();

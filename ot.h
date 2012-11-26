@@ -15,12 +15,14 @@ struct _ot_type {
   
   void *(*create)();
   void (*free)(void *doc);
+  // Read an op from binary bytes. Returns bytes read on success, negative errcode on failure.
+  ssize_t (*read)(ot_op *result, void *data, size_t length);
   
-  int (*check)(void *doc, void *op);
-  void (*apply)(void *doc, void *op);
+  int (*check)(void *doc, const ot_op *op);
+  void (*apply)(void *doc, ot_op *op);
   
   // COMPOSE!
-  void (*transform)(ot_op *result, void *op1, void *op2, bool isLeft);
+  void (*transform)(ot_op *result, ot_op *op1, ot_op *op2, bool isLeft);
 };
 
 typedef const struct _ot_type ot_type;

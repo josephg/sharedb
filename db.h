@@ -99,9 +99,9 @@ typedef void (*db_get_cb)(char *error, void *user, ot_document *doc);
 void db_get(database *db, const sds doc_name, void *user, db_get_cb callback);
 
 #ifdef __BLOCKS__
-typedef void (^db_get_cb_b)(char *error, ot_document *doc);
+typedef void (^db_get_bcb)(char *error, ot_document *doc);
 // Version of db_get which uses blocks.
-void db_get_b(database *db, const sds doc_name, db_get_cb_b callback);
+void db_get_b(database *db, const sds doc_name, db_get_bcb callback);
 #endif
 
 // Valid errors:
@@ -111,11 +111,18 @@ void db_get_b(database *db, const sds doc_name, db_get_cb_b callback);
 //  Op at future version
 //  Op too old
 //  Op invalid
-typedef void (*db_apply_cb)(char *error, void *user, size_t newVersion);
+typedef void (*db_apply_cb)(char *error, void *user, size_t new_version);
 
 // Apply an operation to the database
-void db_apply_op(database *db, const sds doc_name, size_t version, void *op, size_t op_length,
+void db_apply_op(const database *db, ot_document *doc, size_t version, const ot_op *op,
                  void *user, db_apply_cb callback);
+
+#ifdef __BLOCKS__
+typedef void (^db_apply_bcb)(char *error, size_t new_version);
+// Version of db_get which uses blocks.
+void db_apply_op_b(const database *db, ot_document *doc, size_t version, const ot_op *op,
+                   db_apply_bcb callback);
+#endif
 
 /*
 // Valid errors:
