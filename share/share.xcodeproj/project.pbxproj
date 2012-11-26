@@ -18,6 +18,7 @@
 		FD98373816631DB1006BCC26 /* sds.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373216631DB1006BCC26 /* sds.c */; };
 		FD98373B16631DDB006BCC26 /* net.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373916631DDB006BCC26 /* net.c */; };
 		FD98373D1663297B006BCC26 /* protocol.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373C1663297B006BCC26 /* protocol.c */; };
+		FD9837401663B41A006BCC26 /* buffer.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373F1663B41A006BCC26 /* buffer.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,6 +87,8 @@
 		FD98373A16631DDB006BCC26 /* net.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = net.h; sourceTree = "<group>"; };
 		FD98373C1663297B006BCC26 /* protocol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = protocol.c; sourceTree = "<group>"; };
 		FD98373E16632A15006BCC26 /* sharedb.1 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.man; name = sharedb.1; path = ../sharedb.1; sourceTree = "<group>"; };
+		FD98373F1663B41A006BCC26 /* buffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = buffer.c; sourceTree = "<group>"; };
+		FD9837411663B47C006BCC26 /* buffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = buffer.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -173,6 +176,8 @@
 			isa = PBXGroup;
 			children = (
 				FD98372F16631DB1006BCC26 /* main.c */,
+				FD98373F1663B41A006BCC26 /* buffer.c */,
+				FD9837411663B47C006BCC26 /* buffer.h */,
 				FD98373916631DDB006BCC26 /* net.c */,
 				FD98373A16631DDB006BCC26 /* net.h */,
 				FD98373C1663297B006BCC26 /* protocol.c */,
@@ -271,6 +276,7 @@
 				FD98373816631DB1006BCC26 /* sds.c in Sources */,
 				FD98373B16631DDB006BCC26 /* net.c in Sources */,
 				FD98373D1663297B006BCC26 /* protocol.c in Sources */,
+				FD9837401663B41A006BCC26 /* buffer.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
