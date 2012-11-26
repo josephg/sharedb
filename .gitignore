@@ -1,0 +1,12 @@
+*.o
+*.swp
+.DS_Store
+Debug
+Release
+*.suo
+*.sdf
+*.vcxproj.*
+Build
+*.dSYM
+*.xcworkspace
+xcuserdata
