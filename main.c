@@ -8,13 +8,13 @@
 #include "text-composable.h"
 #include "net.h"
 
-void print_doc(char *error, void *user, size_t version, const ot_type *type, void *data) {
+void print_doc(char *error, void *user, ot_document *doc) {
   if (error) {
     printf("Error: %s\n", error);
   } else {
-    printf("Version: %zd, type: %s\n", version, type->name);
-    if (type == &text_composable) {
-      unsigned char *str = rope_createcstr((rope *)data, NULL);
+    printf("Version: %zd, type: %s\n", doc->version, doc->type->name);
+    if (doc->type == &text_composable) {
+      unsigned char *str = rope_createcstr((rope *)doc->snapshot, NULL);
       printf("Contents: '%s'\n", str);
       free(str);
     }
