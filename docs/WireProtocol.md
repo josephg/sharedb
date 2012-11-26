@@ -40,3 +40,15 @@ Errors:
 
 - __Doc does not exist__
 - __Doc already open__: The document has already been opened.
+
+
+### Submit op
+
+Text ops are encoded in binary as follows:
+
+- 2 bytes: unsigned short counting the number of components (N)
+- Followed by N:
+	- 1 byte op type (SKIP = 1, INSERT = 3, DELETE = 4)
+	- If the op type is an insert, a null-terminated string. Otherwise 4 bytes of skip / delete size.
+
+A submit op message is type 1, followed by the version (uint32) and then the op.

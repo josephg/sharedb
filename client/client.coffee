@@ -29,6 +29,29 @@ connect = (port, host, cb) ->
 
         client.write buffer.flush()
 
+      sendOp: (docName, version, op, callback) ->
+        console.log 'submitting op'
+
+        buffer.r 1 | 0x80
+        buffer.zstring docName
+
+        buffer.uint32 version
+        buffer.uint16 op.length
+        for o in op
+          if typeof o is 'number'
+            buffer.uint8 1
+            buffer.uint32 o
+          else if typeof o is 'string'
+            buffer.uint8 3
+            buffer.zstring o
+          else if o.d?
+            buffer.uint8 4
+            buffer.uint32 o.d
+          else
+            throw new Error "Invalid op component: #{o}"
+
+        client.write buffer.flush()
+
     cb null, c
 
   client.on 'error', (e) ->
@@ -38,4 +61,6 @@ s = connect null, (error, c) ->
   return console.error "Error: '#{error}'" if error
   c.open 'hi', (e) ->
     console.log 'opened!'
+
+  c.sendOp 'hi', 2, [2, '-internet-']
 
