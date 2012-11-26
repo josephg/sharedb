@@ -1,4 +1,16 @@
 net = require 'net'
+buffer = (require './binary').writeBuffer()
+
+# Small tweaks - reset should skip the packet length.
+buffer.r = (type) ->
+  buffer.reset()
+  buffer.uint32 0
+  buffer.uint8 type if type?
+
+buffer.flush = ->
+  data = buffer.data()
+  data.writeUInt32LE data.length - 4, 0
+  data
 
 connect = (port, host, cb) ->
   if typeof host is 'function'
@@ -11,15 +23,11 @@ connect = (port, host, cb) ->
     c =
       open: (docName, callback) ->
         console.log "trying to open #{docName}"
-
-        b = new Buffer 4 + 1 + docName.length + 1
-        b.writeUInt32LE b.length - 4, 0 # packet length
-        console.log b.length - 4
-        b.writeUInt8 3 | 0x80, 4 # open + set doc name
-        b.write docName, 5 # doc name
-        b.writeInt8 0, 5 + docName.length # write the trailing \0.
         
-        client.write b
+        buffer.r 3 | 0x80
+        buffer.zstring docName
+
+        client.write buffer.flush()
 
     cb null, c
 
