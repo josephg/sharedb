@@ -8,6 +8,8 @@
 #include "text-composable.h"
 #include "net.h"
 
+#include "buffer.h"
+
 void print_doc(ot_document *doc) {
   printf("Version: %zd, type: %s\n", doc->version, doc->type->name);
   if (doc->type == &text_composable) {

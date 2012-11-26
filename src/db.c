@@ -146,7 +146,7 @@ static void add_op_to_cache(ot_document *doc, ot_op *op) {
   memcpy(doc->op_cache + op_size * doc->version, op, op_size);
 }
 
-void db_apply_op(const database *db, ot_document *doc, size_t version, const ot_op *op,
+void db_apply_op(const database *db, ot_document *doc, uint32_t version, const ot_op *op,
    void *user, db_apply_cb callback) {
   assert(db);
   assert(doc);
@@ -181,13 +181,13 @@ void db_apply_op(const database *db, ot_document *doc, size_t version, const ot_
 }
 
 #ifdef __BLOCKS__
-static void _apply_op_b_cb(char *error, void *user, size_t new_version) {
+static void _apply_op_b_cb(char *error, void *user, uint32_t new_version) {
   db_apply_bcb cb = (db_apply_bcb)user;
   cb(error, new_version);
   Block_release(cb);
 }
 
-void db_apply_op_b(const database *db, ot_document *doc, size_t version, const ot_op *op,
+void db_apply_op_b(const database *db, ot_document *doc, uint32_t version, const ot_op *op,
                    db_apply_bcb callback) {
   db_apply_op(db, doc, version, op, (void *)Block_copy(callback), _apply_op_b_cb);
 }

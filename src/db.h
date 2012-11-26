@@ -30,7 +30,7 @@ typedef struct ot_document_t {
   const ot_type *type;
   
   void *snapshot;
-  size_t version;
+  uint32_t version;
   
   size_t op_cache_capacity;
   void *op_cache;
@@ -111,16 +111,16 @@ void db_get_b(database *db, const sds doc_name, db_get_bcb callback);
 //  Op at future version
 //  Op too old
 //  Op invalid
-typedef void (*db_apply_cb)(char *error, void *user, size_t new_version);
+typedef void (*db_apply_cb)(char *error, void *user, uint32_t new_version);
 
 // Apply an operation to the database
-void db_apply_op(const database *db, ot_document *doc, size_t version, const ot_op *op,
+void db_apply_op(const database *db, ot_document *doc, uint32_t version, const ot_op *op,
                  void *user, db_apply_cb callback);
 
 #ifdef __BLOCKS__
-typedef void (^db_apply_bcb)(char *error, size_t new_version);
+typedef void (^db_apply_bcb)(char *error, uint32_t new_version);
 // Version of db_get which uses blocks.
-void db_apply_op_b(const database *db, ot_document *doc, size_t version, const ot_op *op,
+void db_apply_op_b(const database *db, ot_document *doc, uint32_t version, const ot_op *op,
                    db_apply_bcb callback);
 #endif
 

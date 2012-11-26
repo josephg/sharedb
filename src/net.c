@@ -4,14 +4,33 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <stdint.h>
 
 open_pair *open_pair_alloc() {
+  // Object pool me
   return malloc(sizeof(open_pair));
 }
 
 void open_pair_free(open_pair *pair) {
   // Change me to use an object pool.
   free(pair);
+}
+
+write_req *write_req_alloc() {
+  // Should be using an object pool!!
+  write_req *req = malloc(sizeof(write_req));
+  buf_init(&req->buffer);
+  
+  buf_reset(&req->buffer);
+  // & seek past the length field. We'll fill that in later.
+  buf_seek(&req->buffer, 4);
+  return req;
+}
+
+void write_req_free(write_req *req) {
+  // mmm how about that object pool...
+  buf_free(&req->buffer);
+  free(req);
 }
 
 static void close_pair(open_pair *pair) {
@@ -121,6 +140,23 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
       c->offset = 0;
     }
   }
+}
+
+static void write_cb(uv_write_t *write, int status) {
+  // Honestly, I don't care if there was an error writing to the client. If there was an error,
+  // the client has probably disconnected by now anyway.
+  write_req *req = (write_req *)((void *)write - offsetof(write_req, write));
+  write_req_free(req);
+}
+
+void client_write(client *c, write_req *req) {
+  // First go back to the start of the packet and fill in the length.
+  buf_seek(&req->buffer, 0);
+  // The length field doesn't include itself. Hence the - 4.
+  buf_uint32(&req->buffer, (uint32_t)req->buffer.length - 4);
+  
+  uv_buf_t buf = uv_buf_init(req->buffer.bytes, req->buffer.length);
+  uv_write(&req->write, (uv_stream_t *)&c->socket, &buf, 1, write_cb);
 }
 
 // Callback for libuv's uv_listen(server, ...) method.

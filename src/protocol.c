@@ -6,9 +6,8 @@
 #include "net.h"
 #include "db.h"
 
-
 // It might make more sense to put this function into db.h.
-static void open_doc(client *client, sds doc_name, void (^callback)(char *error)) {
+static void handle_open(client *client, sds doc_name, void (^callback)(char *error)) {
   printf("Open '%s'\n", doc_name);
   client_retain(client);
   
@@ -48,6 +47,37 @@ static void open_doc(client *client, sds doc_name, void (^callback)(char *error)
   });
 }
 
+// Handle a MSG_OP packet.
+// Not implemented: dupIfSource
+static void handle_op(client *client, uint32_t version, char *op_data, size_t op_data_size,
+      void (^callback)(char *error, uint32_t new_version)) {
+  // Inside the block below, the packet data won't be valid anymore. I can't parse it now because
+  // I don't know what the data type is until the block (below), by which time the packet itself
+  // might have been rewritten with new data over the wire. I'll copy it to a stack-local buffer
+  // This won't work with VSC - but thats a bridge to cross when we get to it.
+  char op_buffer[op_data_size];
+  memcpy(op_buffer, op_data, op_data_size);
+  
+  // I don't know why I need to do this, or if there are dragons involved.
+  char *b = op_buffer;
+  
+  db_get_b(client->db, client->doc_name, ^(char *error, ot_document *doc) {
+    if (error) {
+      if (callback) callback(error, UINT32_MAX);
+      return;
+    }
+    ot_op op;
+    ssize_t bytes_read = doc->type->read(&op, b, op_data_size);
+    if (bytes_read < 0) {
+      // Error parsing the op.
+      if (callback) callback("Error parsing op", UINT32_MAX);
+      return;
+    }
+    
+    // The callback parameters match, so we can just chain 'em.
+    db_apply_op_b(client->db, doc, version, &op, callback);
+  });
+}
 
 static bool read_bytes(void *dest, void *src, void *end, size_t length) {
   if (length + src >= end) {
@@ -71,10 +101,10 @@ static sds read_string(char **src, char *end) {
   }
 }
 
-#define READ_INT32(dest) if(end - data < 4) return false; dest = *(int *)data; data += 4
+#define READ_INT32(dest) if(end - data < 4) return true; dest = *(int *)data; data += 4
 
 // Handle a pending packet. There must be a packet's worth of buffers waiting in c.
-bool handle_packet(struct client_t *c) {
+bool handle_packet(client *c) {
   // I don't know if this is the best way to do this. It would be nice to avoid extra memcpys,
   // although one large memcpy is cheaper than lots of small ones.
   bool error = false;
@@ -108,53 +138,18 @@ bool handle_packet(struct client_t *c) {
   
   switch (type) {
     case MSG_OPEN:
-      open_doc(c, c->doc_name, ^(char *error) {
+      handle_open(c, c->doc_name, ^(char *error) {
         printf("Open callback - error: '%s'\n", error);
-        
-        // ... Reply to the client.
-        
       });
       break;
       
     case MSG_OP: {
-      // Packet contents:
-      // - Version
-      // - Op. Op data is specific to the OT type.
-      // Not implemented: dupIfSource
-      if (c->doc_name == NULL) return true;
       uint32_t version;
       READ_INT32(version);
-      // Inside the block below, the packet data won't be valid anymore. I'll copy it to a local
-      // buffer and then parse it.
-      // This won't work with VSC - but thats a bridge to cross when we get to it.
       size_t op_size = end - data;
-      char op_buffer[op_size];
-      memcpy(op_buffer, data, op_size);
-      data = end;
-      // I don't know why I need to do this, or if there are dragons involved.
-      char *b = op_buffer;
-      
-      db_get_b(c->db, c->doc_name, ^(char *error, ot_document *doc) {
-        if (error) {
-          // ... Pass the error back to the client.
-          return;
-        }
-        ot_op op;
-        ssize_t bytes_read = doc->type->read(&op, b, op_size);
-        if (bytes_read < 0) {
-          // Error parsing the op.
-          fprintf(stderr, "Error parsing op");
-          return;
-        }
-        
-        db_apply_op_b(c->db, doc, version, &op, ^(char *error, size_t new_v) {
-          printf("Op applied.. error: '%s', new version %ld\n", error, new_v);
-          
-          //print_doc(doc);
-        });
+      handle_op(c, version, data, op_size, ^(char *error, uint32_t new_version) {
       });
-      
-      
+      data = end;
       break;
     }
       

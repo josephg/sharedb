@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "uv.h"
 #include "sds.h"
+#include "buffer.h"
 
 struct client_t;
 struct uv_loop_s;
@@ -57,7 +58,7 @@ typedef struct client_t {
   uint32_t offset; // Where we're up to in the current packet (including the length)
   
   uint32_t packet_length; // Size of the currently incoming packet.
-  char *packet; // The buffer has
+  char *packet; // The incoming packet itself.
   size_t packet_capacity;
   
   // The name of the most recently accessed document. This is cached, so subsequent requests on
@@ -82,5 +83,17 @@ static inline void client_retain(client *client) {
   client->retain_count++;
 }
 void client_release(client *client);
+
+// This contains an outgoing packet.
+typedef struct {
+  buffer buffer;
+  uv_write_t write;
+} write_req;
+
+write_req *write_req_alloc();
+write_req *write_req_clone(write_req *orig);
+
+// Write the write request out to a client. This consumes the request.
+void client_write(client *c, write_req *req);
 
 #endif
