@@ -1,5 +1,7 @@
 read = (buffer, offset, len) ->
-  # You suck, chrome.
+  # This code needs to be adjusted to use nodejs buffers instead of array buffers.
+  throw new Error 'Not implemented'
+
   if len?
     view = new DataView(buffer, offset, len)
   else if offset?
