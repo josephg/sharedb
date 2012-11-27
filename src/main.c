@@ -13,7 +13,7 @@
 void print_doc(ot_document *doc) {
   printf("Version: %zd, type: %s\n", doc->version, doc->type->name);
   if (doc->type == &text_composable) {
-    unsigned char *str = rope_createcstr((rope *)doc->snapshot, NULL);
+    unsigned char *str = rope_create_cstr((rope *)doc->snapshot);
     printf("Contents: '%s'\n", str);
     free(str);
   }

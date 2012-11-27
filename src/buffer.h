@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "sds.h"
+#include <rope.h>
 
 typedef struct {
   char *bytes;
@@ -31,6 +32,9 @@ static inline void buf_reset(buffer *b) {
 void *_buf_insert_pos(buffer *b, size_t length);
 
 #define XX *(typeof(value) *)_buf_insert_pos(b, sizeof(value)) = value;
+// Write the various numeric types. These functions all write using the native byte order, which is
+// (delightfully) little endian basically everywhere now.
+// TODO: Make this code endian-aware.
 static inline void buf_uint32(buffer *b, uint32_t value) { XX }
 static inline void buf_uint16(buffer *b, uint16_t value) { XX }
 static inline void buf_uint8 (buffer *b, uint8_t  value) { XX }
@@ -43,6 +47,15 @@ static inline void buf_float64(buffer *b, double value) { XX }
 static inline void buf_float32(buffer *b, float value) { XX }
 #undef XX
 
-void buf_zstring(buffer *b, sds str);
+// Write a null-terminated string to tbe buffer
+void buf_zstring(buffer *b, char *str, size_t strlen);
+
+static inline void buf_zstring_sds(buffer *b, sds str) {
+  buf_zstring(b, str, sdslen(str));
+}
+
+static inline void buf_zstring_rope(buffer *b, rope *rope) {
+  rope_write_cstr(rope, _buf_insert_pos(b, rope_byte_count(rope)));
+}
 
 #endif
