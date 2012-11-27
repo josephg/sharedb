@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 #include "uv.h"
-#include "sds.h"
+#include "dstr.h"
 #include "buffer.h"
 
 struct client_t;
@@ -46,7 +46,8 @@ enum message_type {
   // Server -> client
   MSG_OP_APPLIED = 6,
   
-  MSG_FLAG_HAS_DOC_NAME = 0x80
+  MSG_FLAG_ERROR = 0x40,
+  MSG_FLAG_HAS_DOC_NAME = 0x80,
 };
 
 typedef struct client_t {
@@ -64,7 +65,8 @@ typedef struct client_t {
   // The name of the most recently accessed document. This is cached, so subsequent requests on
   // the same document don't need the docname resent.
   // It starts off as NULL.
-  sds doc_name;
+  dstr client_doc_name;
+  dstr server_doc_name;
   
   struct database_t *db;
   
@@ -91,7 +93,8 @@ typedef struct {
 } write_req;
 
 write_req *write_req_alloc();
-write_req *write_req_clone(write_req *orig);
+void write_req_free(write_req *req);
+//write_req *write_req_clone(write_req *orig);
 
 // Write the write request out to a client. This consumes the request.
 void client_write(client *c, write_req *req);

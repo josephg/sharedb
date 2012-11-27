@@ -8,7 +8,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "sds.h"
+#include "dstr.h"
 #include <rope.h>
 
 typedef struct {
@@ -50,8 +50,8 @@ static inline void buf_float32(buffer *b, float value) { XX }
 // Write a null-terminated string to tbe buffer
 void buf_zstring(buffer *b, char *str, size_t strlen);
 
-static inline void buf_zstring_sds(buffer *b, sds str) {
-  buf_zstring(b, str, sdslen(str));
+static inline void buf_zstring_dstr(buffer *b, dstr str) {
+  buf_zstring(b, str, dstr_len(str));
 }
 
 static inline void buf_zstring_rope(buffer *b, rope *rope) {

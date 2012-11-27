@@ -27,7 +27,7 @@ void *_buf_insert_pos(buffer *b, size_t length) {
     
     b->bytes = realloc(b->bytes, b->capacity);
   }
-  
+
   if (b->pos > b->length) b->length = b->pos;
   return &b->bytes[old_pos];
 }

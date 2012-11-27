@@ -3,7 +3,7 @@
 
 #include "ot.h"
 #include "dict.h"
-#include "sds.h"
+#include "dstr.h"
 #include "net.h"
 
 struct client_t;
@@ -22,8 +22,6 @@ typedef struct database_t {
   
   
 } database;
-
-
 
 
 typedef struct ot_document_t {
@@ -77,7 +75,7 @@ typedef void (*db_create_cb)(char *error, ot_document *doc, void *user);
 // Create a new document with the specified name and type.
 // Calls callback when complete.
 // TODO: use opt_load_initial_content.
-void db_create(database *, const char *doc_name, ot_type *, void *user, db_create_cb callback);
+void db_create(database *, const dstr doc_name, ot_type *, void *user, db_create_cb callback);
 
 
 // Valid errors:
@@ -86,7 +84,7 @@ void db_create(database *, const char *doc_name, ot_type *, void *user, db_creat
 typedef void (*db_delete_cb)(char *error, void *user);
 
 // Removes a document from the database
-void db_delete(database *db, const sds doc_name, void *user, db_delete_cb callback);
+void db_delete(database *db, const dstr doc_name, void *user, db_delete_cb callback);
 
 
 // Valid errors:
@@ -96,12 +94,12 @@ typedef void (*db_get_cb)(char *error, void *user, ot_document *doc);
 
 // Get the specified document. Returned via callback. Retain the document if you need it beyond the
 // call stack.
-void db_get(database *db, const sds doc_name, void *user, db_get_cb callback);
+void db_get(database *db, const dstr doc_name, void *user, db_get_cb callback);
 
 #ifdef __BLOCKS__
 typedef void (^db_get_bcb)(char *error, ot_document *doc);
 // Version of db_get which uses blocks.
-void db_get_b(database *db, const sds doc_name, db_get_bcb callback);
+void db_get_b(database *db, const dstr doc_name, db_get_bcb callback);
 #endif
 
 // Valid errors:
@@ -131,7 +129,7 @@ void db_apply_op_b(const database *db, ot_document *doc, uint32_t version, const
 //  Versions invalid
 typedef void (*db_get_ops_cb)(char *error, void *user);
 
-void db_get_ops(database *db, const sds doc_name, void *dest, size_t vstart, size_t vnum,
+void db_get_ops(database *db, const dstr doc_name, void *dest, size_t vstart, size_t vnum,
                 void *user, db_get_ops_cb callback);
 */
 

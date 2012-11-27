@@ -15,7 +15,7 @@
 		FD98373516631DB1006BCC26 /* dict.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98372D16631DB1006BCC26 /* dict.c */; };
 		FD98373616631DB1006BCC26 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98372F16631DB1006BCC26 /* main.c */; };
 		FD98373716631DB1006BCC26 /* ot.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373016631DB1006BCC26 /* ot.c */; };
-		FD98373816631DB1006BCC26 /* sds.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373216631DB1006BCC26 /* sds.c */; };
+		FD98373816631DB1006BCC26 /* dstr.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373216631DB1006BCC26 /* dstr.c */; };
 		FD98373B16631DDB006BCC26 /* net.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373916631DDB006BCC26 /* net.c */; };
 		FD98373D1663297B006BCC26 /* protocol.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373C1663297B006BCC26 /* protocol.c */; };
 		FD9837401663B41A006BCC26 /* buffer.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373F1663B41A006BCC26 /* buffer.c */; };
@@ -81,8 +81,8 @@
 		FD98372F16631DB1006BCC26 /* main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
 		FD98373016631DB1006BCC26 /* ot.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ot.c; sourceTree = "<group>"; };
 		FD98373116631DB1006BCC26 /* ot.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ot.h; sourceTree = "<group>"; };
-		FD98373216631DB1006BCC26 /* sds.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = sds.c; sourceTree = "<group>"; };
-		FD98373316631DB1006BCC26 /* sds.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = sds.h; sourceTree = "<group>"; };
+		FD98373216631DB1006BCC26 /* dstr.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = dstr.c; sourceTree = "<group>"; };
+		FD98373316631DB1006BCC26 /* dstr.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dstr.h; sourceTree = "<group>"; };
 		FD98373916631DDB006BCC26 /* net.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = net.c; sourceTree = "<group>"; };
 		FD98373A16631DDB006BCC26 /* net.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = net.h; sourceTree = "<group>"; };
 		FD98373C1663297B006BCC26 /* protocol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = protocol.c; sourceTree = "<group>"; };
@@ -185,10 +185,10 @@
 				FD98372C16631DB1006BCC26 /* db.h */,
 				FD98373016631DB1006BCC26 /* ot.c */,
 				FD98373116631DB1006BCC26 /* ot.h */,
+				FD98373216631DB1006BCC26 /* dstr.c */,
+				FD98373316631DB1006BCC26 /* dstr.h */,
 				FD98372D16631DB1006BCC26 /* dict.c */,
 				FD98372E16631DB1006BCC26 /* dict.h */,
-				FD98373216631DB1006BCC26 /* sds.c */,
-				FD98373316631DB1006BCC26 /* sds.h */,
 			);
 			name = src;
 			path = ../src;
@@ -273,7 +273,7 @@
 				FD98373516631DB1006BCC26 /* dict.c in Sources */,
 				FD98373616631DB1006BCC26 /* main.c in Sources */,
 				FD98373716631DB1006BCC26 /* ot.c in Sources */,
-				FD98373816631DB1006BCC26 /* sds.c in Sources */,
+				FD98373816631DB1006BCC26 /* dstr.c in Sources */,
 				FD98373B16631DDB006BCC26 /* net.c in Sources */,
 				FD98373D1663297B006BCC26 /* protocol.c in Sources */,
 				FD9837401663B41A006BCC26 /* buffer.c in Sources */,

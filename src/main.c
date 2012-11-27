@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "uv.h"
-#include "sds.h"
+#include "dstr.h"
 #include "db.h"
 #include "ot.h"
 #include "rope.h"
@@ -24,7 +24,7 @@ int main(int argc, const char *argv[]) {
   database db;
   db_init(&db);
   
-  sds docName = sdsnew("hi");
+  dstr docName = dstr_new("hi");
   db_create(&db, docName, &text_composable, NULL, NULL);
   db_get_b(&db, docName, ^(char *error, ot_document *doc) {
     if (error) {
@@ -39,7 +39,7 @@ int main(int argc, const char *argv[]) {
     print_doc(doc);
   });
   
-  sdsfree(docName);
+  dstr_release(docName);
   
   uv_loop_t *loop = uv_default_loop();
   net_listen(&db, loop, 8766);

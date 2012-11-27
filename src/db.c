@@ -12,23 +12,20 @@ static ot_document doc_add(database *db, char *name, ot_type *type, void *initia
 }
 */
 
-static unsigned int dict_sds_hash(const void *key) {
-  return dictGenHashFunction((unsigned char*)key, (int)sdslen((char*)key));
+static unsigned int dict_dstr_hash(const void *key) {
+  return dictGenHashFunction((unsigned char*)key, (int)dstr_len((dstr)key));
 }
 
-static void *dict_sds_dup(void *data, const void *key) {
-  return sdsdup((const sds)key);
+static void *dict_dstr_dup(void *data, const void *key) {
+  return dstr_retain((const dstr)key);
 }
 
-static int dict_sds_key_compare(void *data, const void *key1, const void *key2) {
-  size_t l1 = sdslen((sds)key1);
-  size_t l2 = sdslen((sds)key2);
-  if (l1 != l2) return 0;
-  return memcmp(key1, key2, l1) == 0;
+static int dict_dstr_key_compare(void *data, const void *key1, const void *key2) {
+  return dstr_eq((dstr)key1, (dstr)key2);
 }
 
-static void dict_sds_key_destructor(void *data, void *val) {
-  sdsfree(val);
+static void dict_dstr_key_destructor(void *data, void *val) {
+  dstr_release((dstr)val);
 }
 
 static void dict_val_destructor(void *data, void *obj) {
@@ -37,13 +34,13 @@ static void dict_val_destructor(void *data, void *obj) {
   free(doc);
 }
 
-/* Db->document, keys are sds strings, vals are Redis objects. */
+/* Db->document, keys are dstr strings, vals are ot_documents. */
 dictType db_dict_type = {
-  dict_sds_hash,                /* hash function */
-  dict_sds_dup,                       /* key dup */
+  dict_dstr_hash,                /* hash function */
+  dict_dstr_dup,                       /* key dup */
   NULL,                       /* val dup */
-  dict_sds_key_compare,          /* key compare */
-  dict_sds_key_destructor,          /* key destructor */
+  dict_dstr_key_compare,          /* key compare */
+  dict_dstr_key_destructor,          /* key destructor */
   dict_val_destructor               /* val destructor */
 };
 
@@ -77,7 +74,7 @@ void doc_release(ot_document *doc) {
   }
 }
 
-void db_create(database *db, const char *doc_name, ot_type *type,
+void db_create(database *db, dstr doc_name, ot_type *type,
     void *user, db_create_cb callback) {
   assert(db);
   assert(doc_name);
@@ -101,7 +98,7 @@ void db_create(database *db, const char *doc_name, ot_type *type,
   }
 }
 
-void db_delete(database *db, const sds doc_name, void *user, db_delete_cb callback) {
+void db_delete(database *db, const dstr doc_name, void *user, db_delete_cb callback) {
   assert(db);
   assert(doc_name);
   int status = dictDelete(db->docs, doc_name);
@@ -110,7 +107,7 @@ void db_delete(database *db, const sds doc_name, void *user, db_delete_cb callba
 
 typedef float V __attribute__(( vector_size(16) ));
 
-void db_get(database *db, const sds doc_name, void *user, db_get_cb callback) {
+void db_get(database *db, const dstr doc_name, void *user, db_get_cb callback) {
   assert(db);
   assert(doc_name);
   assert(callback);
@@ -132,7 +129,7 @@ static void _db_get_b_cb(char *error, void *user, ot_document *doc) {
   Block_release(cb);
 }
 
-void db_get_b(database *db, const sds doc_name, db_get_bcb callback) {
+void db_get_b(database *db, const dstr doc_name, db_get_bcb callback) {
   db_get(db, doc_name, (void *)Block_copy(callback), _db_get_b_cb);
 }
 #endif
