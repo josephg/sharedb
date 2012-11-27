@@ -11,12 +11,14 @@ All integers are transmitted using little endian. All strings are sent as null t
 The server and client exchange a series of messages over this connection. Each message starts with:
 
 - Length (bytes) of remaining packet (uint32, little endian)
-- Message type (one byte) OR'ed with optional docName flag (0x80). Message types are listed below. The docName flag indicates that this packet replaces the currently *in use* docName.
-- If the docName flag is set, the packet next contains the new in use docName. The named document does not have to exist.
+- Message type (one byte) OR'ed with optional docName flag (0x80) and error flag (0x40). Message types are listed below. The docName flag indicates that this packet replaces the currently *in use* docName.
+- If the docName flag is set, the packet next lists the new *in use* docName (a string). The named document does not have to exist.
+- If the error flag is set, the packet contains a string error message and nothing more.
 
 
 ## Message types:
 
+- **Hello**: An initial introduction message exchange sent between server & client. Both parties exchange protocol version number.
 - **Open**: Open the named document. All operations applied to an open document are sent to all clients with that document open. Clients can open as many documents as they like.
 - **Close**: Close the specified document. No more operations will be sent. Note that there may already be operations in-flight for the named document.
 - **Op**: Apply an operation to the named document
@@ -24,6 +26,11 @@ The server and client exchange a series of messages over this connection. Each m
 - **Get Ops**: Get historical operations for the specified document
 - **Snapshot**: Get a snapshot of the document at its current version
 
+### Hello
+
+For now, this packet simply consists of a one byte protocol version number. If the version numbers don't match, the connection is dropped.
+
+The client needs to send this packet immediately upon connecting. The server will respond in kind. This exchange must happen before any other packets are sent. (Though obviously, neither the client nor the server needs to wait on the hello packet being received before sending further messages).
 
 ### Open
 
@@ -52,3 +59,7 @@ Text ops are encoded in binary as follows:
 	- If the op type is an insert, a null-terminated string. Otherwise 4 bytes of skip / delete size.
 
 A submit op message is type 1, followed by the version (uint32) and then the op.
+
+### Op acknowledgement
+
+When a client sends an op to the server, the server replies to that client with an op acknowledgement. The acknowledgement simply contains the new server version number (uint32).
