@@ -127,7 +127,7 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
       assert(c->offset - 4 <= c->packet_length);
     }
     
-    printf("Read in %zd\n", nread);
+    //printf("Read in %zd\n", nread);
     
     if (c->offset == c->packet_length + 4) {
       // Read a packet.

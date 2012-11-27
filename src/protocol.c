@@ -48,6 +48,8 @@ static void handle_open(client *client, dstr doc_name, void (^callback)(char *er
   });
 }
 
+void print_doc(ot_document *doc);
+
 // Handle a MSG_OP packet.
 // Not implemented: dupIfSource
 static void handle_op(client *client, uint32_t version, char *op_data, size_t op_data_size,
@@ -188,6 +190,11 @@ bool handle_packet(client *c) {
       handle_op(c, version, data, op_size, ^(char *error, uint32_t new_version) {
         uint8_t type = MSG_OP_APPLIED | (error ? MSG_FLAG_ERROR : 0);
         write_req *req = req_for_immediate_writing_to(c, type, doc_name);
+        
+        db_get_b(c->db, doc_name, ^(char *error, ot_document *doc) {
+          if (doc) print_doc(doc);
+        });
+        
         dstr_release(doc_name);
         if (error) {
           buf_zstring(&req->buffer, error, strlen(error));
@@ -207,7 +214,7 @@ bool handle_packet(client *c) {
   }
   
   if (data != end) {
-    fprintf(stderr, "%ld trailing bytes\n", end - data);
+    fprintf(stderr, "%ld trailing bytes on packet type %d\n", end - data, type);
     //    read_bytes(c, NULL, c->num_bytes - expected_remaining_bytes);
     //    return true;
   }
