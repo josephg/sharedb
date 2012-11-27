@@ -3,11 +3,12 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <assert.h>
 #include "net.h"
 #include "db.h"
 
 // It might make more sense to put this function into db.h.
-static void handle_open(client *client, sds doc_name, void (^callback)(char *error)) {
+static void handle_open(client *client, dstr doc_name, void (^callback)(char *error)) {
   printf("Open '%s'\n", doc_name);
   client_retain(client);
   
@@ -61,13 +62,13 @@ static void handle_op(client *client, uint32_t version, char *op_data, size_t op
   // I don't know why I need to do this, or if there are dragons involved.
   char *b = op_buffer;
   
-  db_get_b(client->db, client->doc_name, ^(char *error, ot_document *doc) {
+  db_get_b(client->db, client->client_doc_name, ^(char *error, ot_document *doc) {
     if (error) {
       if (callback) callback(error, UINT32_MAX);
       return;
     }
     ot_op op;
-    ssize_t bytes_read = doc->type->read(&op, b, op_data_size);
+    ssize_t bytes_read = doc->type->read_op(&op, b, op_data_size);
     if (bytes_read < 0) {
       // Error parsing the op.
       if (callback) callback("Error parsing op", UINT32_MAX);
@@ -88,20 +89,50 @@ static bool read_bytes(void *dest, void *src, void *end, size_t length) {
   return false;
 }
 
-static sds read_string(char **src, char *end) {
+static dstr read_string(char **src, char *end) {
   char *data = *src;
   size_t len = strnlen(data, end - data);
   if (len == end - data) {
     fprintf(stderr, "Not enough bytes left for the string!\n");
     return NULL;
   } else {
-    sds str = sdsnewlen(data, len);
+    dstr str = dstr_new2(data, len);
     *src += len + 1; // Also skip the \0
     return str;
   }
 }
 
 #define READ_INT32(dest) if(end - data < 4) return true; dest = *(int *)data; data += 4
+
+// This creates and returns a write request that must be sent to client_write before
+// the main loop resumes.
+static write_req *req_for_immediate_writing_to(client *c, uint8_t type, dstr doc_name) {
+  write_req *req = write_req_alloc();
+  
+  // If the type already has the has_doc_name flag, something's gone wrong somewhere.
+  assert(!(type & MSG_FLAG_HAS_DOC_NAME));
+  
+  // The buffer has already skipped the length bytes (write_req_alloc takes care of that). Now
+  // I need to (maybe!) write the doc_name.
+  // Rules:
+  //  no if doc_name is NULL
+  //  yes if c->server_doc_name is NULL
+  //  no if the c->server_doc_name is equal to doc_name
+  //  yes otherwise.
+  if (doc_name != NULL && (c->server_doc_name == NULL || !dstr_eq(doc_name, c->server_doc_name))) {
+    if (c->server_doc_name) {
+      dstr_release(c->server_doc_name);
+    }
+    c->server_doc_name = dstr_retain(doc_name);
+
+    buf_uint8(&req->buffer, type | MSG_FLAG_HAS_DOC_NAME);
+    buf_zstring_dstr(&req->buffer, doc_name);
+  } else {
+    buf_uint8(&req->buffer, type);
+  }
+
+  return req;
+}
 
 // Handle a pending packet. There must be a packet's worth of buffers waiting in c.
 bool handle_packet(client *c) {
@@ -117,37 +148,53 @@ bool handle_packet(client *c) {
   unsigned char type = *(data++);
   
   if (type & MSG_FLAG_HAS_DOC_NAME) {
-    if (c->doc_name) {
-      //sdsclear(c->doc_name);
-      // ... and sdscat. But I'm lazy for now.
-      
-      sdsfree(c->doc_name);
+    // It'd be nice to do all this without additional allocations, but I'm not really sure thats
+    // possible.
+    if (c->client_doc_name) {
+      dstr_release(c->client_doc_name);
     }
-    c->doc_name = read_string(&data, end);
-    if (c->doc_name == NULL) {
+    c->client_doc_name = read_string(&data, end);
+    if (c->client_doc_name == NULL) {
       return true;
     }
   }
   
   type &= 0x7f;
   
-  if (c->doc_name == NULL) {
+  if (c->client_doc_name == NULL) {
     fprintf(stderr, "Doc name not known\n");
     return true;
   }
   
   switch (type) {
-    case MSG_OPEN:
-      handle_open(c, c->doc_name, ^(char *error) {
-        printf("Open callback - error: '%s'\n", error);
+    case MSG_OPEN: {
+      dstr doc_name = dstr_retain(c->client_doc_name);
+      handle_open(c, doc_name, ^(char *error) {
+        uint8_t type = MSG_OPEN | (error ? MSG_FLAG_ERROR : 0);
+        write_req *req = req_for_immediate_writing_to(c, type, doc_name);
+        dstr_release(doc_name);
+        if (error) {
+          buf_zstring(&req->buffer, error, strlen(error));
+        }
+        client_write(c, req);
       });
       break;
-      
+    }
     case MSG_OP: {
       uint32_t version;
       READ_INT32(version);
       size_t op_size = end - data;
+      dstr doc_name = dstr_retain(c->client_doc_name);
       handle_op(c, version, data, op_size, ^(char *error, uint32_t new_version) {
+        uint8_t type = MSG_OP_APPLIED | (error ? MSG_FLAG_ERROR : 0);
+        write_req *req = req_for_immediate_writing_to(c, type, doc_name);
+        dstr_release(doc_name);
+        if (error) {
+          buf_zstring(&req->buffer, error, strlen(error));
+        } else {
+          buf_uint32(&req->buffer, new_version);
+        }
+        client_write(c, req);
       });
       data = end;
       break;

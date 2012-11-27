@@ -11,8 +11,12 @@ static void free_tc(void *doc) {
   rope_free((rope *)doc);
 }
 
-static ssize_t read_tc(ot_op *result_out, void *data, size_t length) {
+static ssize_t read_op_tc(ot_op *result_out, void *data, size_t length) {
   return text_op_from_bytes(&result_out->text, data, length);
+}
+
+void write_op_tc(text_op *op, write_fn write, void *user) {
+  text_op_to_bytes(op, write, user);
 }
 
 static int check_tc(void *doc, const ot_op *op) {
@@ -43,7 +47,9 @@ const ot_type text_composable = {
   
   create_tc, // Create
   free_tc,
-  read_tc,
+  
+  read_op_tc,
+  write_op_tc,
   
   check_tc,
   apply_tc,

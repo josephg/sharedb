@@ -9,14 +9,18 @@ typedef union {
   text_op text;
 } ot_op;
 
+typedef void (*write_fn)(void *bytes, size_t num, void *user);
+
 struct _ot_type {
   char *name;
   size_t op_size; // Expected size in bytes of an op
   
   void *(*create)();
   void (*free)(void *doc);
+  
   // Read an op from binary bytes. Returns bytes read on success, negative errcode on failure.
-  ssize_t (*read)(ot_op *result, void *data, size_t length);
+  ssize_t (*read_op)(ot_op *result, void *data, size_t length);
+  void (*write_op)(text_op *op, write_fn write, void *user);
   
   int (*check)(void *doc, const ot_op *op);
   void (*apply)(void *doc, ot_op *op);

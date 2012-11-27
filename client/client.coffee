@@ -54,6 +54,9 @@ connect = (port, host, cb) ->
 
     cb null, c
 
+  client.on 'data', (msg) ->
+    console.log "msg: '#{msg}'"
+
   client.on 'error', (e) ->
     cb e
 
