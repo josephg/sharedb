@@ -1,13 +1,4 @@
-read = (buffer, offset, len) ->
-  # This code needs to be adjusted to use nodejs buffers instead of array buffers.
-  throw new Error 'Not implemented'
-
-  if len?
-    view = new DataView(buffer, offset, len)
-  else if offset?
-    view = new DataView(buffer, offset)
-  else
-    view = new DataView(buffer)
+exports.read = (buffer) ->
   pos = 0
 
   p = (size) ->
@@ -15,31 +6,30 @@ read = (buffer, offset, len) ->
     pos += size
     oldPos
 
-  int32: -> view.getInt32 (p 4), true
-  int16: -> view.getInt16 (p 2), true
-  int8:  -> view.getInt8  (p 1)
+  int32: -> buffer.readInt32LE (p 4)
+  int16: -> buffer.readInt16LE (p 2)
+  int8:  -> buffer.readInt8    (p 1)
 
-  uint32: -> view.getUint32 (p 4), true
-  uint16: -> view.getUint16 (p 2), true
-  uint8:  -> view.getUint8  (p 1)
+  uint32: -> buffer.readUInt32LE (p 4)
+  uint16: -> buffer.readUInt16LE (p 2)
+  uint8:  -> buffer.readUInt8    (p 1)
 
-  float64: -> view.getFloat64 (p 8), true
-  float32: -> view.getFloat32 (p 4), true
+  float64: -> buffer.readDoubleLE (p 8)
+  float32: -> buffer.readFloatLE  (p 4)
 
   skip: (x) -> pos += x
 
-  bytestring: (len) ->
-    s = new Array(len)
-    for i in [0...len]
-      c = @uint8()
-      unless c # Skip '\0'
-        @skip len - i - 1
-        return s.join ''
+  zstring: ->
+    # Wow, rewriting strlen in JS.
+    end = pos
+    end++ while buffer.readInt8 end
+    
+    # End points to the '\0' character.
+    str = buffer.toString 'utf8', pos, end
+    pos = end + 1
+    str
 
-      s[i] = String.fromCharCode c
-    s.join ''
-
-  bytesLeft: -> view.byteLength - pos
+  bytesLeft: -> buffer.length - pos
 
 
 exports.writeBuffer = ->
