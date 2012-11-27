@@ -7,6 +7,8 @@
 #include "net.h"
 #include "db.h"
 
+static const uint8_t PROTOCOL_VERSION = 0;
+
 // It might make more sense to put this function into db.h.
 static void handle_open(client *client, dstr doc_name, void (^callback)(char *error)) {
   printf("Open '%s'\n", doc_name);
@@ -163,12 +165,38 @@ bool handle_packet(client *c) {
   
   type &= 0x7f;
   
-  if (c->client_doc_name == NULL) {
-    fprintf(stderr, "Doc name not known\n");
-    return true;
+  if (type != MSG_HELLO) {
+    if (c->said_hello == false) {
+      fprintf(stderr, "How rude - client didn't say hi\n");
+      return true;
+    }
+
+    if (c->client_doc_name == NULL) {
+      fprintf(stderr, "Doc name not known\n");
+      return true;
+    }
   }
-  
+
   switch (type) {
+    case MSG_HELLO: {
+      if (c->said_hello) {
+        // Repeated hellos = error.
+        return true;
+      }
+      unsigned char p_version = *(data++);
+      if (p_version != PROTOCOL_VERSION) {
+        // The protocol version is currently 1.
+        fprintf(stderr, "Wrong protocol version - was %d expected %d\n", p_version, PROTOCOL_VERSION);
+        return true;
+      }
+      printf("Oh hi\n");
+      c->said_hello = true;
+      
+      write_req *req = req_for_immediate_writing_to(c, type, NULL);
+      buf_uint8(&req->buffer, PROTOCOL_VERSION);
+      client_write(c, req);
+      break;
+    }
     case MSG_OPEN: {
       dstr doc_name = dstr_retain(c->client_doc_name);
       handle_open(c, doc_name, ^(char *error) {

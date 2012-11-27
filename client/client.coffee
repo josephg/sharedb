@@ -4,6 +4,7 @@ buffer = binary.writeBuffer()
 {EventEmitter} = require 'events'
 
 # Mirrors src/net.h
+MSG_HELLO = 0
 MSG_OP = 1
 MSG_CURSOR = 2
 
@@ -15,6 +16,8 @@ MSG_OP_APPLIED = 6
 
 MSG_FLAG_ERROR = 0x40
 MSG_FLAG_HAS_DOC_NAME = 0x80
+
+PROTOCOL_VERSION = 0
 
 buffer.flush = ->
   data = buffer.data()
@@ -36,7 +39,7 @@ connect = (port, host, cb) ->
     # Skip the packet length part of the packet for now. We'll fill it in later.
     buffer.uint32 0
  
-    if docName isnt cDocName
+    if docName and docName isnt cDocName
       cDocName = docName
       buffer.uint8 type | MSG_FLAG_HAS_DOC_NAME
       buffer.zstring docName
@@ -82,6 +85,11 @@ connect = (port, host, cb) ->
 
     cb null, c
 
+  # Send a hello message immediately.
+  preparePacket MSG_HELLO
+  buffer.uint8 PROTOCOL_VERSION
+  client.write buffer.flush()
+
   client.on 'data', require('./buffer') (b) ->
     packet = binary.read b
     type = packet.uint8()
@@ -98,6 +106,12 @@ connect = (port, host, cb) ->
       false
 
     switch type
+      when MSG_HELLO
+        v = packet.uint8()
+        if v isnt PROTOCOL_VERSION
+          throw new Error "Incorrect protocol version - got #{v} expected #{PROTOCOL_VERSION}"
+        console.log 'hello message'
+        c.emit 'hello'
       when MSG_OPEN
         e = packet.zstring() if error
         c.emit 'open', e, sDocName

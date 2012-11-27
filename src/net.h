@@ -35,6 +35,7 @@ void open_pair_free(open_pair *pair);
 
 enum message_type {
   // Common
+  MSG_HELLO = 0,
   MSG_OP = 1,
   MSG_CURSOR = 2,
   
@@ -46,6 +47,7 @@ enum message_type {
   // Server -> client
   MSG_OP_APPLIED = 6,
   
+  MSG_FLAG_CREATE = 0x20,
   MSG_FLAG_ERROR = 0x40,
   MSG_FLAG_HAS_DOC_NAME = 0x80,
 };
@@ -77,6 +79,8 @@ typedef struct client_t {
   // The retain count starts at 1, which means the client is connected. The client is freed when
   // the retain count gets to 0.
   int retain_count;
+  
+  bool said_hello;
 } client;
 
 void net_listen(struct database_t *db, struct uv_loop_s *loop, int port);
