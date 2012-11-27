@@ -16,12 +16,6 @@ MSG_OP_APPLIED = 6
 MSG_FLAG_ERROR = 0x40
 MSG_FLAG_HAS_DOC_NAME = 0x80
 
-# Small tweaks - reset should skip the packet length.
-buffer.r = (type) ->
-  buffer.reset()
-  buffer.uint32 0
-  buffer.uint8 type if type?
-
 buffer.flush = ->
   data = buffer.data()
   data.writeUInt32LE data.length - 4, 0
@@ -34,14 +28,27 @@ connect = (port, host, cb) ->
 
   port ||= 8766
 
+  sDocName = null
+  cDocName = null
+
+  preparePacket = (type, docName) ->
+    buffer.reset()
+    # Skip the packet length part of the packet for now. We'll fill it in later.
+    buffer.uint32 0
+ 
+    if docName isnt cDocName
+      cDocName = docName
+      buffer.uint8 type | MSG_FLAG_HAS_DOC_NAME
+      buffer.zstring docName
+    else
+      buffer.uint8 type
+
   c = new EventEmitter
   client = net.connect port, host, ->
     c.open = (docName, callback) ->
       console.log "trying to open #{docName}"
-      
-      buffer.r 3 | MSG_FLAG_HAS_DOC_NAME
-      buffer.zstring docName
 
+      preparePacket MSG_OPEN, docName
       client.write buffer.flush()
 
       listener = (error, openedDoc) ->
@@ -53,11 +60,9 @@ connect = (port, host, cb) ->
       c.once 'open', listener
 
     c.sendOp = (docName, version, op, callback) ->
-      console.log 'submitting op'
+      console.log 'submitting op', op
 
-      buffer.r 1 | MSG_FLAG_HAS_DOC_NAME
-      buffer.zstring docName
-
+      preparePacket MSG_OP, docName
       buffer.uint32 version
       buffer.uint16 op.length
       for o in op
@@ -77,13 +82,9 @@ connect = (port, host, cb) ->
 
     cb null, c
 
-  sDocName = null
-  cDocName = null
-
   client.on 'data', require('./buffer') (b) ->
     packet = binary.read b
     type = packet.uint8()
-    console.log "type: #{type}"
 
     if type & MSG_FLAG_HAS_DOC_NAME
       # Doc name incoming!
@@ -105,18 +106,24 @@ connect = (port, host, cb) ->
           e = packet.zstring()
         else
           v = packet.uint32()
-        c.emit 'op applied', e, v
+        c.emit 'op applied', e, sDocName, v
+      else
+        console.log "Unhandled type #{type}"
 
   client.on 'error', (e) ->
     cb e
 
 s = connect null, (error, c) ->
   return console.error "Error: '#{error}'" if error
-  c.open 'hi2', (e) ->
+  c.open 'hi', (e) ->
     return console.log "error opening document: #{e}" if e
-    console.log 'opened!'
+    console.log "opened 'hi'"
 
   c.sendOp 'hi', 2, [2, '-internet-']
+
+  c.on 'op applied', (e, docName, v) ->
+    return console.error "Could not apply op: #{e}" if e
+    console.log "op applied on #{docName} -> version #{v}"
 
 
 
