@@ -16,7 +16,9 @@ struct string_t {
   char bytes[];
 };
 
-typedef char *dstr;
+typedef const char *dstr;
+
+extern const dstr dstr_empty;
 
 #define DSTR_BASE(s) (struct string_t *)((s) - offsetof(struct string_t, bytes))
 

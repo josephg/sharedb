@@ -17,7 +17,7 @@ static unsigned int dict_dstr_hash(const void *key) {
 }
 
 static void *dict_dstr_dup(void *data, const void *key) {
-  return dstr_retain((const dstr)key);
+  return (void *)dstr_retain((dstr)key);
 }
 
 static int dict_dstr_key_compare(void *data, const void *key1, const void *key2) {

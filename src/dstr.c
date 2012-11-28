@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <assert.h>
 
+static struct string_t empty_string = {0, 1, {'\0'}};
+
+const dstr dstr_empty = empty_string.bytes;
+
 dstr dstr_new2(const char *data, size_t len) {
   struct string_t *string = malloc(sizeof(struct string_t) + len + 1);
   assert(len < UINT_FAST16_MAX);
