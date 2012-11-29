@@ -28,38 +28,68 @@ The server and client exchange a series of messages over this connection. Each m
 
 ### Hello
 
-For now, this packet simply consists of a one byte protocol version number. If the version numbers don't match, the connection is dropped.
+For now, this packet simply consists of a one byte protocol version number (currently 0). If the version numbers don't match, the connection is dropped.
 
 The client needs to send this packet immediately upon connecting. The server will respond in kind. This exchange must happen before any other packets are sent. (Though obviously, neither the client nor the server needs to wait on the hello packet being received before sending further messages).
 
+This packet will eventually also contain auth tokens.
+
 ### Open
 
-The open message requests that the server stream the client any operations applied to a document. The server only sends operations applied to the document by other clients. An open document can be closed using the `close` message.
+The open message requests that the server stream the client any operations applied to a document. This does not include the client's own operations.
 
-An open request can come in 2 different forms:
+An open document can be closed using the `close` message.
 
-- Open a document at a specified version. This is used when you have a cached document snapshot and want to reopen the document. All operations applied since the specified version are sent to the client immediately.
-- Send the client a document snapshot, and open a document at the version specified by the snapshot. This is the equivalent of sending a snapshot request, then opening the document at the snapshot's version.
+Open messages have two optional flags: _snapshot_ and _create_. These flags are OR'ed with the message type field.
+- The _snapshot_ flag (`0x10`) indicates that the server should send the client a copy of the current document snapshot.
+- The _create_ flag (`0x20`) indicates that the server should create the document if it does not already exist.
+
+After the regular packet header, the open request contains the following fields:
+- (*string*) Requested **docType**, or an empty string. If the create flag is set, this is the type of the created document. If the document already exists in the database but has a different type, a *Type mismatch* error is returned.
+- (*uint32*) Document opening **version**. This is the version from which the server will stream operations to the client. Any operations between the requested version and the current version will be sent to the client immediately after the document is open as if they were new operations. If you don't care about the version (for example, you're creating a new document or you want a document snapshot), pass `UINT32_MAX` in the version field.
+
+Practically, open requests usually come in one of 2 forms:
+
+- The document is unknown, and potentially new. Usually you'll want to send both the _snapshot_ and _create_ flags. Send the requested type and `UINT32_MAX` for the version. The server will respond by opening (and potentially creating) the document and the client will receive a snapshot.
+- You already have a cached document snapshot. Pass no flags. Send the known type & version number in the open request. The client should automatically catch up to the current document version.
 
 Open requests can also be combined with `create` messages. In this case, the server will automatically create the document if it does not exist. In this case, the type must be specified.
 
 Errors:
 
-- __Doc does not exist__
-- __Doc already open__: The document has already been opened.
+- __Doc does not exist__: Requested document does not exist and the _create_ flag was not set.
+- __Doc already open__: The document is already open by this client.
+- __Unknown type__: The requested type is unknown to the server
+- __Type mismatch__: The document is not of the requested type. (Pass an empty string in the type field to specify any type)
+- __Invalid version__: The requested version is newer than the document's actual version. (Use `UINT32_MAX` to open the most recent version of the document)
+- __Cannot fetch historical snapshots__: The snapshot at a particular version was requested. You shouldn't request a document snapshot and specify a version in the same open request.
 
 
 ### Submit op
 
-Text ops are encoded in binary as follows:
+A submit op message is used to send an operation to the server. The server will reply with an _op applied_ message.
 
-- 2 bytes: unsigned short counting the number of components (N)
-- Followed by N:
-	- 1 byte op type (SKIP = 1, INSERT = 3, DELETE = 4)
-	- If the op type is an insert, a null-terminated string. Otherwise 4 bytes of skip / delete size.
-
-A submit op message is type 1, followed by the version (uint32) and then the op.
+A submit op request contains the following fields:
+- (_uint32_) Document version at which the operation should be applied
+- (op) The operation itself. The serialization format depends on the op type. Refer to the appendix below to see how ops of each type are serialised.
 
 ### Op acknowledgement
 
 When a client sends an op to the server, the server replies to that client with an op acknowledgement. The acknowledgement simply contains the new server version number (uint32).
+
+----
+
+# Serialization of common types
+
+## Text
+
+Text ops are encoded in binary as follows:
+
+- (_uint16_): Number of operation components (N)
+- Followed by N op components:
+-- (_uint8_) Op type (SKIP = 1, INSERT = 3, DELETE = 4)
+-- If the type is SKIP, _uint32_ skip size
+-- If the type is INSERT, _string_ inserted text
+-- If the type is DELETE, _uint32_ deleted region size
+
+Text documents are simply serialized as strings.
