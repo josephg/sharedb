@@ -77,6 +77,11 @@ typedef void (*db_create_cb)(char *error, ot_document *doc, void *user);
 // TODO: use opt_load_initial_content.
 void db_create(database *, const dstr doc_name, ot_type *, void *user, db_create_cb callback);
 
+#ifdef __BLOCKS__
+typedef void (^db_create_bcb)(char *error, ot_document *doc);
+void db_create_b(database *, const dstr doc_name, ot_type *, db_create_bcb callback);
+#endif
+
 
 // Valid errors:
 //  Document does not exist
@@ -84,7 +89,7 @@ void db_create(database *, const dstr doc_name, ot_type *, void *user, db_create
 typedef void (*db_delete_cb)(char *error, void *user);
 
 // Removes a document from the database
-void db_delete(database *db, const dstr doc_name, void *user, db_delete_cb callback);
+void db_delete(database *, const dstr doc_name, void *user, db_delete_cb callback);
 
 
 // Valid errors:
@@ -94,12 +99,12 @@ typedef void (*db_get_cb)(char *error, void *user, ot_document *doc);
 
 // Get the specified document. Returned via callback. Retain the document if you need it beyond the
 // call stack.
-void db_get(database *db, const dstr doc_name, void *user, db_get_cb callback);
+void db_get(database *, const dstr doc_name, void *user, db_get_cb callback);
 
 #ifdef __BLOCKS__
 typedef void (^db_get_bcb)(char *error, ot_document *doc);
 // Version of db_get which uses blocks.
-void db_get_b(database *db, const dstr doc_name, db_get_bcb callback);
+void db_get_b(database *, const dstr doc_name, db_get_bcb callback);
 #endif
 
 // Valid errors:

@@ -98,6 +98,18 @@ void db_create(database *db, dstr doc_name, ot_type *type,
   }
 }
 
+#ifdef __BLOCKS__
+static void _create_bcb(char *error, ot_document *doc, void *user) {
+  db_create_bcb cb = (db_create_bcb)user;
+  cb(error, doc);
+  Block_release(cb);
+}
+
+void db_create_b(database *db, const dstr doc_name, ot_type *type, db_create_bcb callback) {
+  db_create(db, doc_name, type, (void *)Block_copy(callback), _create_bcb);
+}
+#endif
+
 void db_delete(database *db, const dstr doc_name, void *user, db_delete_cb callback) {
   assert(db);
   assert(doc_name);
@@ -123,14 +135,14 @@ void db_get(database *db, const dstr doc_name, void *user, db_get_cb callback) {
 }
 
 #ifdef __BLOCKS__
-static void _db_get_b_cb(char *error, void *user, ot_document *doc) {
+static void _get_bcb(char *error, void *user, ot_document *doc) {
   db_get_bcb cb = (db_get_bcb)user;
   cb(error, doc);
   Block_release(cb);
 }
 
 void db_get_b(database *db, const dstr doc_name, db_get_bcb callback) {
-  db_get(db, doc_name, (void *)Block_copy(callback), _db_get_b_cb);
+  db_get(db, doc_name, (void *)Block_copy(callback), _get_bcb);
 }
 #endif
 
