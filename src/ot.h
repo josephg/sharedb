@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include "text-composable.h"
+#include "text.h"
 
 typedef union ot_op_t {
   text_op text;

@@ -5,7 +5,7 @@
 #include "db.h"
 #include "ot.h"
 #include "rope.h"
-#include "text-composable.h"
+#include "text.h"
 #include "net.h"
 
 #include "buffer.h"

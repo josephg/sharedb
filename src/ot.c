@@ -1,7 +1,7 @@
 #include "ot.h"
 
 #include <rope.h>
-#include <text-composable.h>
+#include "text.h"
 
 static void *create_tc() {
   return rope_new();
