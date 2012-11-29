@@ -15,8 +15,18 @@ static ssize_t read_op_tc(ot_op *result_out, void *data, size_t length) {
   return text_op_from_bytes(&result_out->text, data, length);
 }
 
-void write_op_tc(text_op *op, write_fn write, void *user) {
-  text_op_to_bytes(op, write, user);
+void write_op_tc(ot_op *op, write_fn write, void *user) {
+  text_op_to_bytes(&op->text, write, user);
+}
+
+// Text docs are written as a big NULL-terminated string.
+void write_doc_tc(void *doc, write_fn write, void *user) {
+  ROPE_FOREACH((rope *)doc, n) {
+    write(rope_node_data(n), rope_node_num_bytes(n), user);
+  }
+  // And a NULL terminator.
+  uint8_t zero = '\0';
+  write(&zero, 1, user);
 }
 
 static int check_tc(void *doc, const ot_op *op) {
@@ -51,9 +61,19 @@ const ot_type text_composable = {
   read_op_tc,
   write_op_tc,
   
+  write_doc_tc,
+  
   check_tc,
   apply_tc,
   
   // COMPOSE!
   transform_tc
 };
+
+ot_type *ot_type_with_name(const char *name) {
+  if (strcmp(name, "text") == 0) {
+    return &text_composable;
+  } else {
+    return NULL;
+  }
+}

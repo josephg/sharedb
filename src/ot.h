@@ -20,7 +20,10 @@ struct _ot_type {
   
   // Read an op from binary bytes. Returns bytes read on success, negative errcode on failure.
   ssize_t (*read_op)(ot_op *result, void *data, size_t length);
-  void (*write_op)(text_op *op, write_fn write, void *user);
+  void (*write_op)(ot_op *op, write_fn write, void *user);
+  
+  // Read fn goes here.
+  void (*write_doc)(void *doc, write_fn write, void *user);
   
   int (*check)(void *doc, const ot_op *op);
   void (*apply)(void *doc, ot_op *op);
@@ -32,5 +35,7 @@ struct _ot_type {
 typedef const struct _ot_type ot_type;
 
 extern ot_type text_composable;
+
+ot_type *ot_type_with_name(const char *name);
 
 #endif

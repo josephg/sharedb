@@ -11,6 +11,10 @@
 #include "dstr.h"
 #include <rope.h>
 
+// Its gross including this here - this transitively pulls in all the OT type headers.
+// Needed for buf_op and buf_doc.
+#include "ot.h"
+
 typedef struct {
   char *bytes;
   uint32_t length;
@@ -57,5 +61,8 @@ static inline void buf_zstring_dstr(buffer *b, dstr str) {
 static inline void buf_zstring_rope(buffer *b, rope *rope) {
   rope_write_cstr(rope, _buf_insert_pos(b, rope_byte_count(rope)));
 }
+
+void buf_op(buffer *b, ot_type *type, ot_op *op);
+void buf_doc(buffer *b, ot_type *type, void *snapshot);
 
 #endif

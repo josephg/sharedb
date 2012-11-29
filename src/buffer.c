@@ -37,3 +37,17 @@ void buf_zstring(buffer *b, const char *str, size_t len) {
   memcpy(start, str, len);
   ((char *)start)[len] = '\0';
 }
+
+static void buf_write_fn(void *bytes, size_t num, void *user) {
+  buffer *b = (buffer *)user;
+  void *start = _buf_insert_pos(b, num);
+  memcpy(start, bytes, num);
+}
+
+void buf_op(buffer *b, ot_type *type, ot_op *op) {
+  type->write_op(op, buf_write_fn, b);
+}
+
+void buf_doc(buffer *b, ot_type *type, void *snapshot) {
+  type->write_doc(snapshot, buf_write_fn, b);
+}
