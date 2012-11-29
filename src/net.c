@@ -60,6 +60,13 @@ void client_release(client *client) {
       close_pair(prev);
     }
     
+    if (client->client_doc_name) {
+      dstr_release(client->client_doc_name);
+    }
+    if (client->server_doc_name) {
+      dstr_release(client->server_doc_name);
+    }
+    
     free(client->packet);
     free(client);
   }
