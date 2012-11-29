@@ -33,6 +33,9 @@ typedef struct open_doc_pair_t {
 open_pair *open_pair_alloc();
 void open_pair_free(open_pair *pair);
 
+// Unlink the pair from the open list and free it.
+void close_pair(open_pair *pair);
+
 enum message_type {
   // Common
   MSG_HELLO = 1,

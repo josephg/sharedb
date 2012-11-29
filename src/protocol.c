@@ -130,6 +130,24 @@ static void handle_op(client *client, uint32_t version, char *op_data, size_t op
   });
 }
 
+static char *handle_close(client *client, dstr doc_name) {
+  open_pair *prev = NULL;
+  for (open_pair *o = client->open_docs_head; o; o = o->next) {
+    if (dstr_eq(o->doc->name, doc_name)) {
+      if (prev) {
+        prev->next = o->next;
+      } else {
+        client->open_docs_head = o->next;
+      }
+      close_pair(o);
+      return NULL;
+    }
+    prev = o;
+  }
+
+  return "Doc is not open";
+}
+
 static bool read_bytes(void *dest, void *src, void *end, size_t length) {
   if (length + src >= end) {
     return true;
@@ -156,11 +174,14 @@ static dstr read_string(char **src, char *end) {
 
 // This creates and returns a write request that must be sent to client_write before
 // the main loop resumes.
-static write_req *req_for_immediate_writing_to(client *c, uint8_t type, dstr doc_name) {
+static write_req *req_for_immediate_writing_to(client *c, uint8_t type,
+                                               dstr doc_name, char *error) {
   write_req *req = write_req_alloc();
   
   // If the type already has the has_doc_name flag, something's gone wrong somewhere.
-  assert(!(type & MSG_FLAG_HAS_DOC_NAME));
+  assert(!(type & (MSG_FLAG_HAS_DOC_NAME | MSG_FLAG_ERROR)));
+  
+  if (error) type |= MSG_FLAG_ERROR;
   
   // The buffer has already skipped the length bytes (write_req_alloc takes care of that). Now
   // I need to (maybe!) write the doc_name.
@@ -180,6 +201,8 @@ static write_req *req_for_immediate_writing_to(client *c, uint8_t type, dstr doc
   } else {
     buf_uint8(&req->buffer, type);
   }
+  
+  if (error) buf_zstring(&req->buffer, error);
 
   return req;
 }
@@ -241,7 +264,7 @@ bool handle_packet(client *c) {
       printf("Oh hi\n");
       c->said_hello = true;
       
-      write_req *req = req_for_immediate_writing_to(c, type, NULL);
+      write_req *req = req_for_immediate_writing_to(c, type, NULL, NULL);
       buf_uint8(&req->buffer, PROTOCOL_VERSION);
       client_write(c, req);
       break;
@@ -255,13 +278,10 @@ bool handle_packet(client *c) {
       client_retain(c);
       handle_open(c, doc_name, doc_type, version, flags & (MSG_FLAG_SNAPSHOT | MSG_FLAG_CREATE),
                   ^(char *error, ot_document *doc, uint8_t flags) {
-        uint8_t type = MSG_OPEN | (error ? MSG_FLAG_ERROR : flags);
-        write_req *req = req_for_immediate_writing_to(c, type, doc_name);
+        write_req *req = req_for_immediate_writing_to(c, MSG_OPEN | flags, doc_name, error);
         dstr_release(doc_name);
         dstr_release(doc_type);
-        if (error) {
-          buf_zstring(&req->buffer, error);
-        } else {
+        if (!error) {
           buf_uint32(&req->buffer, doc->version);
           if (flags & MSG_FLAG_SNAPSHOT) {
             buf_zstring(&req->buffer, doc->type->name);
@@ -280,22 +300,26 @@ bool handle_packet(client *c) {
       size_t op_size = end - data;
       dstr doc_name = dstr_retain(c->client_doc_name);
       handle_op(c, version, data, op_size, ^(char *error, uint32_t applied_at) {
-        uint8_t type = MSG_OP_ACK | (error ? MSG_FLAG_ERROR : 0);
-        write_req *req = req_for_immediate_writing_to(c, type, doc_name);
+        write_req *req = req_for_immediate_writing_to(c, MSG_OP_ACK, doc_name, error);
+        dstr_release(doc_name);
+        if (!error) {
+          buf_uint32(&req->buffer, applied_at);
+        }
+        client_write(c, req);
         
         db_get_b(c->db, doc_name, ^(char *error, ot_document *doc) {
           if (doc) print_doc(doc);
         });
         
-        dstr_release(doc_name);
-        if (error) {
-          buf_zstring(&req->buffer, error);
-        } else {
-          buf_uint32(&req->buffer, applied_at);
-        }
-        client_write(c, req);
       });
       data = end;
+      break;
+    }
+    case MSG_CLOSE: {
+      // I'm using the callback style here, but handle_close is always synchronous anyway.
+      char *error = handle_close(c, c->client_doc_name);
+      write_req *req = req_for_immediate_writing_to(c, MSG_CLOSE, c->client_doc_name, error);
+      client_write(c, req);
       break;
     }
       
@@ -319,7 +343,7 @@ void notify_open_submitted(ot_document *doc, client *source, uint32_t version, o
   // subsequent client.
   for (open_pair *pair = doc->open_pair_head; pair; pair = pair->next_client) {
     if (pair->client != source) {
-      write_req *req = req_for_immediate_writing_to(pair->client, MSG_OP, doc->name);
+      write_req *req = req_for_immediate_writing_to(pair->client, MSG_OP, doc->name, NULL);
       buf_uint32(&req->buffer, version);
       buf_op(&req->buffer, doc->type, op);
       client_write(pair->client, req);

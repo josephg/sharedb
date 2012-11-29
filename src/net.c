@@ -34,7 +34,7 @@ void write_req_free(write_req *req) {
   free(req);
 }
 
-static void close_pair(open_pair *pair) {
+void close_pair(open_pair *pair) {
   if (pair->prev_client) {
     pair->prev_client->next_client = pair->next_client;
   } else {

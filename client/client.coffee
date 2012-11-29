@@ -114,6 +114,18 @@ connect = (port, host, cb) ->
 
       client.write buffer.flush()
 
+    c.close = (docName, callback) ->
+      preparePacket MSG_CLOSE, docName
+      client.write buffer.flush()
+
+      listener = (error, doc) ->
+        if doc isnt docName
+          c.once 'close', listener
+        else
+          callback error
+      c.once 'close', listener if callback
+
+
     cb null, c
 
   # Send a hello message immediately.
@@ -139,6 +151,7 @@ connect = (port, host, cb) ->
           throw new Error "Incorrect protocol version - got #{v} expected #{PROTOCOL_VERSION}"
         console.log 'hello message'
         c.emit 'hello'
+
       when MSG_OPEN
         return c.emit 'open', error, sDocName if error
 
@@ -147,6 +160,10 @@ connect = (port, host, cb) ->
           type = packet.zstring()
           snapshot = readSnapshot(packet, type)
         c.emit 'open', null, sDocName, v, type, snapshot
+
+      when MSG_CLOSE
+        c.emit 'close', error, sDocName
+
       when MSG_OP
         if error
           throw new Error 'Error receiving op? What does that even?'
@@ -175,6 +192,8 @@ s = connect null, (error, c) ->
     console.log "opened #{docName} at version #{v} type #{type} snapshot '#{snapshot}'"
 
     c.sendOp docName, v, ["#{v} "]
+
+    c.close docName
 
   c.on 'op applied', (e, docName, v) ->
     return console.error "Could not apply op: #{e}" if e

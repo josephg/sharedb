@@ -65,6 +65,13 @@ Errors:
 - __Invalid version__: The requested version is newer than the document's actual version. (Use `UINT32_MAX` to open the most recent version of the document)
 - __Cannot fetch historical snapshots__: The snapshot at a particular version was requested. You shouldn't request a document snapshot and specify a version in the same open request.
 
+### Close
+
+Close the current document.
+
+Errors:
+
+- __Doc is not open__: Document isn't open anyway.
 
 ### Submit op
 
