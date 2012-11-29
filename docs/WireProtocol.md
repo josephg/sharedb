@@ -21,7 +21,8 @@ The server and client exchange a series of messages over this connection. Each m
 - **Hello**: An initial introduction message exchange sent between server & client. Both parties exchange protocol version number.
 - **Open**: Open the named document. All operations applied to an open document are sent to all clients with that document open. Clients can open as many documents as they like.
 - **Close**: Close the specified document. No more operations will be sent. Note that there may already be operations in-flight for the named document.
-- **Op**: Apply an operation to the named document
+- **Op**: Apply an operation to a document
+- **Op ack**: Acknowledgement that the client's operation has been applied
 - **Cursor**: Move the user's cursor to the specified position
 - **Get Ops**: Get historical operations for the specified document
 - **Snapshot**: Get a snapshot of the document at its current version
@@ -67,7 +68,7 @@ Errors:
 
 ### Submit op
 
-A submit op message is used to send an operation to the server. The server will reply with an _op applied_ message.
+A submit op message is used to send an operation to the server. The server will reply with an _op ack_ message.
 
 A submit op request contains the following fields:
 - (_uint32_) Document version at which the operation should be applied
@@ -76,6 +77,8 @@ A submit op request contains the following fields:
 ### Op acknowledgement
 
 When a client sends an op to the server, the server replies to that client with an op acknowledgement. The acknowledgement simply contains the new server version number (uint32).
+
+The acknowledgement will be in-order with surrounding ops from other clients.
 
 ----
 
