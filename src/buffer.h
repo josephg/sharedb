@@ -52,10 +52,11 @@ static inline void buf_float32(buffer *b, float value) { XX }
 #undef XX
 
 // Write a null-terminated string to tbe buffer
-void buf_zstring(buffer *b, const char *str, size_t strlen);
+void buf_zstring_len(buffer *b, const char *str, size_t strlen);
+void buf_zstring(buffer *b, const char *str);
 
 static inline void buf_zstring_dstr(buffer *b, dstr str) {
-  buf_zstring(b, str, dstr_len(str));
+  buf_zstring_len(b, str, dstr_len(str));
 }
 
 static inline void buf_zstring_rope(buffer *b, rope *rope) {

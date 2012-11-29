@@ -32,10 +32,14 @@ void *_buf_insert_pos(buffer *b, size_t length) {
   return &b->bytes[old_pos];
 }
 
-void buf_zstring(buffer *b, const char *str, size_t len) {
+void buf_zstring_len(buffer *b, const char *str, size_t len) {
   void *start = _buf_insert_pos(b, len + 1);
   memcpy(start, str, len);
   ((char *)start)[len] = '\0';
+}
+
+void buf_zstring(buffer *b, const char *str) {
+  buf_zstring_len(b, str, strlen(str));
 }
 
 static void buf_write_fn(void *bytes, size_t num, void *user) {

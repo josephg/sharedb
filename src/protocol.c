@@ -6,47 +6,92 @@
 #include <assert.h>
 #include "net.h"
 #include "db.h"
+#include "ot.h"
 
 static const uint8_t PROTOCOL_VERSION = 0;
 
+static void open_internal(client *client, ot_document *doc, uint32_t version, uint8_t flags,
+                          void (^callback)(char *error, ot_document *doc, uint8_t flags)) {
+  // Make sure the doc isn't already open.
+  for (open_pair *o = client->open_docs_head; o; o = o->next) {
+    if (o->doc == doc) {
+      if (callback) callback("Doc is already open", NULL, 0);
+      return;
+    }
+  }
+  
+  if (version < doc->version) {
+    if (callback) callback("Getting historical ops in open not implemented yet", NULL, 0);
+    return;
+  }
+  
+  // The document isn't open. Open it.
+  open_pair *pair = open_pair_alloc();
+  pair->client = client;
+  pair->doc = doc;
+  pair->next = client->open_docs_head;
+  client->open_docs_head = pair;
+  
+  pair->next_client = doc->open_pair_head;
+  if (pair->next_client) {
+    pair->next_client->prev_client = pair;
+  }
+  pair->prev_client = NULL;
+  doc->open_pair_head = pair;
+  
+  if (callback) callback(NULL, doc, flags);
+}
+
 // It might make more sense to put this function into db.h.
-static void handle_open(client *client, dstr doc_name, void (^callback)(char *error)) {
+static void handle_open(client *client, dstr doc_name, dstr doc_type,
+                        uint32_t version, uint8_t flags,
+                        void (^callback)(char *error, ot_document *doc, uint8_t flags)) {
   printf("Open '%s'\n", doc_name);
-  client_retain(client);
   
   db_get_b(client->db, doc_name, ^(char *error, ot_document *doc) {
-    // doc_name may have been freed by this point.
-    if (error) {
-      if (callback) callback(error);
-      client_release(client);
+    if (flags & MSG_FLAG_CREATE && error && strcmp(error, "Doc does not exist") == 0) {
+      // Create it.
+      ot_type *type = ot_type_with_name(doc_type);
+      if (type == NULL) {
+        if (callback) callback("Unknown type", NULL, 0);
+        return;
+      }
+      
+      db_create_b(client->db, doc_name, type, ^(char *error, ot_document *doc) {
+        if (error) {
+          if (callback) callback(error, NULL, 0);
+          return;
+        }
+        
+        open_internal(client, doc, doc->version, flags, callback);
+      });
+      return;
+    } else if (error) {
+      if (callback) callback(error, NULL, 0);
       return;
     }
     
-    // First make sure the doc isn't already open.
-    for (open_pair *o = client->open_docs_head; o; o = o->next) {
-      if (o->doc == doc) {
-        if (callback) callback("Doc is already open");
-        client_release(client);
-        return;
-      }
+    // Check the requested version is valid
+    if (version != UINT32_MAX && version > doc->version) {
+      if (callback) callback("Invalid version", NULL, 0);
+      return;
     }
     
-    // The document isn't open. Open it.
-    open_pair *pair = open_pair_alloc();
-    pair->client = client;
-    pair->doc = doc;
-    pair->next = client->open_docs_head;
-    client->open_docs_head = pair;
-    
-    pair->next_client = doc->open_pair_head;
-    if (pair->next_client) {
-      pair->next_client->prev_client = pair;
+    if (version != UINT32_MAX && flags & MSG_FLAG_SNAPSHOT) {
+      if (callback) callback("Cannot fetch historical snapshots", NULL, 0);
+      return;
     }
-    pair->prev_client = NULL;
-    doc->open_pair_head = pair;
     
-    if (callback) callback(NULL);
-    client_release(client);
+    if (doc_type != dstr_empty && strcmp(doc_type, doc->type->name) != 0) {
+      // The document isn't the requested type.
+      if (callback) callback("Type mismatch", NULL, 0);
+      return;
+    }
+    
+    open_internal(client, doc,
+                  version == UINT32_MAX ? doc->version : version,
+                  flags & ~MSG_FLAG_CREATE,
+                  callback);
   });
 }
 
@@ -139,6 +184,7 @@ static write_req *req_for_immediate_writing_to(client *c, uint8_t type, dstr doc
 }
 
 // Handle a pending packet. There must be a packet's worth of buffers waiting in c.
+// Returning true here indicates an unrecoverable error and the client socket is terminated.
 bool handle_packet(client *c) {
   // I don't know if this is the best way to do this. It would be nice to avoid extra memcpys,
   // although one large memcpy is cheaper than lots of small ones.
@@ -151,7 +197,10 @@ bool handle_packet(client *c) {
   if (data == end) return true;
   unsigned char type = *(data++);
   
-  if (type & MSG_FLAG_HAS_DOC_NAME) {
+  uint8_t flags = type & 0xf0;
+  type &= 0xf;
+
+  if (flags & MSG_FLAG_HAS_DOC_NAME) {
     // It'd be nice to do all this without additional allocations, but I'm not really sure thats
     // possible.
     if (c->client_doc_name) {
@@ -162,8 +211,6 @@ bool handle_packet(client *c) {
       return true;
     }
   }
-  
-  type &= 0x7f;
   
   if (type != MSG_HELLO) {
     if (c->said_hello == false) {
@@ -186,7 +233,8 @@ bool handle_packet(client *c) {
       unsigned char p_version = *(data++);
       if (p_version != PROTOCOL_VERSION) {
         // The protocol version is currently 1.
-        fprintf(stderr, "Wrong protocol version - was %d expected %d\n", p_version, PROTOCOL_VERSION);
+        fprintf(stderr, "Wrong protocol version - was %d expected %d\n",
+                p_version, PROTOCOL_VERSION);
         return true;
       }
       printf("Oh hi\n");
@@ -199,14 +247,29 @@ bool handle_packet(client *c) {
     }
     case MSG_OPEN: {
       dstr doc_name = dstr_retain(c->client_doc_name);
-      handle_open(c, doc_name, ^(char *error) {
-        uint8_t type = MSG_OPEN | (error ? MSG_FLAG_ERROR : 0);
+      dstr doc_type = read_string(&data, end); // an empty string if the type isn't specified.
+      if (doc_type == NULL) return true;
+      uint32_t version;
+      READ_INT32(version); // UINT32_MAX means 'use the current version'.
+      client_retain(c);
+      handle_open(c, doc_name, doc_type, version, flags & (MSG_FLAG_SNAPSHOT | MSG_FLAG_CREATE),
+                  ^(char *error, ot_document *doc, uint8_t flags) {
+        uint8_t type = MSG_OPEN | (error ? MSG_FLAG_ERROR : flags);
         write_req *req = req_for_immediate_writing_to(c, type, doc_name);
         dstr_release(doc_name);
+        dstr_release(doc_type);
         if (error) {
-          buf_zstring(&req->buffer, error, strlen(error));
+          buf_zstring(&req->buffer, error);
+        } else {
+          buf_uint32(&req->buffer, doc->version);
+          if (flags & MSG_FLAG_SNAPSHOT) {
+            buf_zstring(&req->buffer, doc->type->name);
+            buf_doc(&req->buffer, doc->type, doc->snapshot);
+            // Also need to add cursors.
+          }
         }
         client_write(c, req);
+        client_release(c);
       });
       break;
     }
@@ -225,7 +288,7 @@ bool handle_packet(client *c) {
         
         dstr_release(doc_name);
         if (error) {
-          buf_zstring(&req->buffer, error, strlen(error));
+          buf_zstring(&req->buffer, error);
         } else {
           buf_uint32(&req->buffer, new_version);
         }

@@ -27,6 +27,10 @@ buffer.flush = ->
   data.writeUInt32LE data.length - 4, 0
   data
 
+readSnapshot = (packet, type) ->
+  throw new Error "Don't know how to read snapshots of type #{type}" unless type is 'text'
+  packet.zstring()
+
 connect = (port, host, cb) ->
   if typeof host is 'function'
     cb = host
@@ -51,17 +55,21 @@ connect = (port, host, cb) ->
 
   c = new EventEmitter
   client = net.connect port, host, ->
-    c.open = (docName, callback) ->
-      console.log "trying to open #{docName}"
+    c.open = (docName, type, callback) ->
+      [type, callback] = [null, type] if typeof type is 'function'
+      console.log "trying to open #{docName}, type: #{type}"
 
-      preparePacket MSG_OPEN, docName
+      flags = MSG_FLAG_SNAPSHOT | if type then MSG_FLAG_CREATE else 0
+      preparePacket MSG_OPEN | flags, docName
+      buffer.zstring if type then type else ''
+      buffer.uint32 0xffffffff # uint32_max for the version
       client.write buffer.flush()
 
-      listener = (error, openedDoc) ->
+      listener = (error, openedDoc, v, type, snapshot) ->
         if openedDoc isnt docName
           c.once 'open', listener
         else
-          callback error
+          callback error, v, type, snapshot
 
       c.once 'open', listener
 
@@ -96,17 +104,13 @@ connect = (port, host, cb) ->
   client.on 'data', require('./buffer') (b) ->
     packet = binary.read b
     type = packet.uint8()
+    flags = type & 0xf0
+    type &= 0xf
 
-    if type & MSG_FLAG_HAS_DOC_NAME
-      # Doc name incoming!
-      sDocName = packet.zstring()
-      type &= ~MSG_FLAG_HAS_DOC_NAME
+    # Doc name incoming!
+    sDocName = packet.zstring() if flags & MSG_FLAG_HAS_DOC_NAME
 
-    error = if type & MSG_FLAG_ERROR
-      type &= ~MSG_FLAG_ERROR
-      true
-    else
-      false
+    error = flags & MSG_FLAG_ERROR
 
     switch type
       when MSG_HELLO
@@ -116,8 +120,15 @@ connect = (port, host, cb) ->
         console.log 'hello message'
         c.emit 'hello'
       when MSG_OPEN
-        e = packet.zstring() if error
-        c.emit 'open', e, sDocName
+        if error
+          e = packet.zstring()
+          c.emit 'open', e, sDocName
+        else
+          v = packet.uint32()
+          if flags & MSG_FLAG_SNAPSHOT
+            type = packet.zstring()
+            snapshot = readSnapshot(packet, type)
+          c.emit 'open', e, sDocName, v, type, snapshot
       when MSG_OP_APPLIED
         if error
           e = packet.zstring()
@@ -132,9 +143,9 @@ connect = (port, host, cb) ->
 
 s = connect null, (error, c) ->
   return console.error "Error: '#{error}'" if error
-  c.open 'hi', (e) ->
+  c.open 'hi', (e, v, type, snapshot) ->
     return console.log "error opening document: #{e}" if e
-    console.log "opened 'hi'"
+    console.log "opened 'hi' at version #{v} type #{type} snapshot '#{snapshot}'"
 
   c.sendOp 'hi', 2, [2, '-internet-']
 
