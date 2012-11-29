@@ -7,6 +7,9 @@ static struct string_t empty_string = {0, 1, {'\0'}};
 const dstr dstr_empty = empty_string.bytes;
 
 dstr dstr_new2(const char *data, size_t len) {
+  if (len == 0) {
+    return dstr_retain(dstr_empty);
+  }
   struct string_t *string = malloc(sizeof(struct string_t) + len + 1);
   assert(len < UINT_FAST16_MAX);
   string->len = (uint_fast16_t)len;
