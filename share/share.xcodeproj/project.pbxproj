@@ -89,6 +89,7 @@
 		FD98373E16632A15006BCC26 /* sharedb.1 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.man; name = sharedb.1; path = ../sharedb.1; sourceTree = "<group>"; };
 		FD98373F1663B41A006BCC26 /* buffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = buffer.c; sourceTree = "<group>"; };
 		FD9837411663B47C006BCC26 /* buffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = buffer.h; sourceTree = "<group>"; };
+		FDFF086F16670A470034F972 /* protocol.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = protocol.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,6 +182,7 @@
 				FD98373916631DDB006BCC26 /* net.c */,
 				FD98373A16631DDB006BCC26 /* net.h */,
 				FD98373C1663297B006BCC26 /* protocol.c */,
+				FDFF086F16670A470034F972 /* protocol.h */,
 				FD98372B16631DB1006BCC26 /* db.c */,
 				FD98372C16631DB1006BCC26 /* db.h */,
 				FD98373016631DB1006BCC26 /* ot.c */,

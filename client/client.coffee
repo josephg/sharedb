@@ -12,7 +12,7 @@ MSG_OPEN = 4
 MSG_CLOSE = 5
 MSG_GET_OPS = 6
 
-MSG_OP_APPLIED = 7
+MSG_OP_ACK = 7
 
 MSG_FLAG_SNAPSHOT = 0x10
 MSG_FLAG_CREATE = 0x20
@@ -22,6 +22,10 @@ MSG_FLAG_HAS_DOC_NAME = 0x80
 
 PROTOCOL_VERSION = 0
 
+OP_COMPONENT_SKIP = 1
+OP_COMPONENT_INSERT = 3
+OP_COMPONENT_DELETE = 4
+
 buffer.flush = ->
   data = buffer.data()
   data.writeUInt32LE data.length - 4, 0
@@ -30,6 +34,22 @@ buffer.flush = ->
 readSnapshot = (packet, type) ->
   throw new Error "Don't know how to read snapshots of type #{type}" unless type is 'text'
   packet.zstring()
+
+readOp = (packet, type) ->
+  throw new Error "Don't know how to read ops of type #{type}" unless type is 'text'
+
+  n = packet.uint16()
+  for c in [0...n]
+    type = packet.uint8()
+    switch type
+      when OP_COMPONENT_SKIP
+        packet.uint32()
+      when OP_COMPONENT_INSERT
+        packet.zstring()
+      when OP_COMPONENT_DELETE
+        {d:packet.uint32()}
+      else
+        throw new Error 'Invalid op component type'
 
 connect = (port, host, cb) ->
   if typeof host is 'function'
@@ -110,7 +130,7 @@ connect = (port, host, cb) ->
     # Doc name incoming!
     sDocName = packet.zstring() if flags & MSG_FLAG_HAS_DOC_NAME
 
-    error = flags & MSG_FLAG_ERROR
+    error = if flags & MSG_FLAG_ERROR then packet.zstring()
 
     switch type
       when MSG_HELLO
@@ -120,21 +140,27 @@ connect = (port, host, cb) ->
         console.log 'hello message'
         c.emit 'hello'
       when MSG_OPEN
+        return c.emit 'open', error, sDocName if error
+
+        v = packet.uint32()
+        if flags & MSG_FLAG_SNAPSHOT
+          type = packet.zstring()
+          snapshot = readSnapshot(packet, type)
+        c.emit 'open', null, sDocName, v, type, snapshot
+      when MSG_OP
         if error
-          e = packet.zstring()
-          c.emit 'open', e, sDocName
-        else
-          v = packet.uint32()
-          if flags & MSG_FLAG_SNAPSHOT
-            type = packet.zstring()
-            snapshot = readSnapshot(packet, type)
-          c.emit 'open', e, sDocName, v, type, snapshot
-      when MSG_OP_APPLIED
-        if error
-          e = packet.zstring()
-        else
-          v = packet.uint32()
-        c.emit 'op applied', e, sDocName, v
+          throw new Error 'Error receiving op? What does that even?'
+
+        v = packet.uint32()
+        op = readOp packet, 'text'
+        c.emit 'op', null, sDocName, v, op
+
+      when MSG_OP_ACK
+        return c.emit 'op applied', error, sDocName if error
+
+        v = packet.uint32()
+        c.emit 'op applied', null, sDocName, v
+
       else
         console.log "Unhandled type #{type}"
 
@@ -143,15 +169,19 @@ connect = (port, host, cb) ->
 
 s = connect null, (error, c) ->
   return console.error "Error: '#{error}'" if error
-  c.open 'hi', (e, v, type, snapshot) ->
+  docName = 'hi2'
+  c.open docName, 'text', (e, v, type, snapshot) ->
     return console.log "error opening document: #{e}" if e
-    console.log "opened 'hi' at version #{v} type #{type} snapshot '#{snapshot}'"
+    console.log "opened #{docName} at version #{v} type #{type} snapshot '#{snapshot}'"
 
-  c.sendOp 'hi', 2, [2, '-internet-']
+    c.sendOp docName, v, ["#{v} "]
 
   c.on 'op applied', (e, docName, v) ->
     return console.error "Could not apply op: #{e}" if e
     console.log "op applied on #{docName} -> version #{v}"
 
+  c.on 'op', (e, docName, v, op) ->
+    console.log "Got an op on #{docName}. Now at v#{v}"
+    console.log op
 
 

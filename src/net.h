@@ -45,7 +45,7 @@ enum message_type {
   MSG_GET_OPS = 6,
   
   // Server -> client
-  MSG_OP_APPLIED = 7,
+  MSG_OP_ACK = 7,
   
   
   // C->S this means you need a fresh copy of the snapshot.
@@ -94,6 +94,7 @@ typedef struct client_t {
   bool said_hello;
 } client;
 
+// Main entrypoint for the net code. Opens the network socket for incoming connections.
 void net_listen(struct database_t *db, struct uv_loop_s *loop, int port);
 
 static inline void client_retain(client *client) {
@@ -114,4 +115,6 @@ void write_req_free(write_req *req);
 // Write the write request out to a client. This consumes the request.
 void client_write(client *c, write_req *req);
 
+// Notify a client that an op has been sent on a document it has open.
+void client_notify_op(client *c, struct ot_document_t *doc, ot_op *op);
 #endif

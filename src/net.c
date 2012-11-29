@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdint.h>
+#include "protocol.h"
 
 open_pair *open_pair_alloc() {
   // Object pool me
@@ -104,9 +105,6 @@ static void close_handle_cb(uv_handle_t *handle) {
   client_release(c);
 }
 
-// In protocol.c
-bool handle_packet(struct client_t *c);
-
 // libuv callback for incoming network data.
 static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
   if (nread < 0) {
@@ -185,7 +183,6 @@ static void got_connection(uv_stream_t* server, int status) {
   
   uv_read_start((uv_stream_t *)&c->socket, alloc_buffer, got_data);
 }
-
 
 void net_listen(database *db, uv_loop_t *loop, int port) {
   uv_tcp_t server = {};

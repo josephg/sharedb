@@ -25,6 +25,7 @@ typedef struct database_t {
 
 
 typedef struct ot_document_t {
+  dstr name;
   const ot_type *type;
   
   void *snapshot;
@@ -40,7 +41,6 @@ typedef struct ot_document_t {
   // op cache
   // metadata
   
-  // listeners?
   // reaping timer
   
   // size_t committed_version;
@@ -107,6 +107,10 @@ typedef void (^db_get_bcb)(char *error, ot_document *doc);
 void db_get_b(database *, const dstr doc_name, db_get_bcb callback);
 #endif
 
+// Called after the op has been applied, but before other clients have been notified that the op is
+// applied.
+// new_version is the version of the doc after the op was applied.
+//
 // Valid errors:
 //  Forbidden
 //  Document does not exist
@@ -117,13 +121,15 @@ void db_get_b(database *, const dstr doc_name, db_get_bcb callback);
 typedef void (*db_apply_cb)(char *error, void *user, uint32_t new_version);
 
 // Apply an operation to the database
-void db_apply_op(const database *db, ot_document *doc, uint32_t version, const ot_op *op,
+void db_apply_op(const database *db, client *source,
+                 ot_document *doc, uint32_t version, const ot_op *op,
                  void *user, db_apply_cb callback);
 
 #ifdef __BLOCKS__
 typedef void (^db_apply_bcb)(char *error, uint32_t new_version);
 // Version of db_get which uses blocks.
-void db_apply_op_b(const database *db, ot_document *doc, uint32_t version, const ot_op *op,
+void db_apply_op_b(const database *db, client *source,
+                   ot_document *doc, uint32_t version, const ot_op *op,
                    db_apply_bcb callback);
 #endif
 

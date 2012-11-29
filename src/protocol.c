@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include "protocol.h"
 #include "net.h"
 #include "db.h"
 #include "ot.h"
@@ -125,7 +126,7 @@ static void handle_op(client *client, uint32_t version, char *op_data, size_t op
     }
     
     // The callback parameters match, so we can just chain 'em.
-    db_apply_op_b(client->db, doc, version, &op, callback);
+    db_apply_op_b(client->db, client, doc, version, &op, callback);
   });
 }
 
@@ -278,8 +279,8 @@ bool handle_packet(client *c) {
       READ_INT32(version);
       size_t op_size = end - data;
       dstr doc_name = dstr_retain(c->client_doc_name);
-      handle_op(c, version, data, op_size, ^(char *error, uint32_t new_version) {
-        uint8_t type = MSG_OP_APPLIED | (error ? MSG_FLAG_ERROR : 0);
+      handle_op(c, version, data, op_size, ^(char *error, uint32_t applied_at) {
+        uint8_t type = MSG_OP_ACK | (error ? MSG_FLAG_ERROR : 0);
         write_req *req = req_for_immediate_writing_to(c, type, doc_name);
         
         db_get_b(c->db, doc_name, ^(char *error, ot_document *doc) {
@@ -290,7 +291,7 @@ bool handle_packet(client *c) {
         if (error) {
           buf_zstring(&req->buffer, error);
         } else {
-          buf_uint32(&req->buffer, new_version);
+          buf_uint32(&req->buffer, applied_at);
         }
         client_write(c, req);
       });
@@ -311,4 +312,17 @@ bool handle_packet(client *c) {
   }
   
   return error;
+}
+
+void notify_open_submitted(ot_document *doc, client *source, uint32_t version, ot_op *op) {
+  // TODO: Speed this up by only serializing the op once, and copy the serialized bytes to each
+  // subsequent client.
+  for (open_pair *pair = doc->open_pair_head; pair; pair = pair->next_client) {
+    if (pair->client != source) {
+      write_req *req = req_for_immediate_writing_to(pair->client, MSG_OP, doc->name);
+      buf_uint32(&req->buffer, version);
+      buf_op(&req->buffer, doc->type, op);
+      client_write(pair->client, req);
+    }
+  }
 }

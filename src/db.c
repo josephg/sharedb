@@ -5,6 +5,7 @@
 #ifdef __BLOCKS__
 #include <Block.h>
 #endif
+#include "protocol.h"
 
 /*
 static ot_document doc_add(database *db, char *name, ot_type *type, void *initial_data) {
@@ -70,7 +71,7 @@ void doc_release(ot_document *doc) {
   doc->retain_count--;
   
   if (doc->retain_count == 0) {
-    // ... Set a timeout to reap the document.
+    // TODO: Set a timeout to reap the document.
   }
 }
 
@@ -85,6 +86,7 @@ void db_create(database *db, dstr doc_name, ot_type *type,
   } else {
     // Create it.
     ot_document *doc = malloc(sizeof(ot_document));
+    doc->name = dstr_retain(doc_name);
     doc->type = type;
     doc->snapshot = type->create(),
     doc->version = 0;
@@ -155,7 +157,8 @@ static void add_op_to_cache(ot_document *doc, ot_op *op) {
   memcpy(doc->op_cache + op_size * doc->version, op, op_size);
 }
 
-void db_apply_op(const database *db, ot_document *doc, uint32_t version, const ot_op *op,
+void db_apply_op(const database *db, client *source,
+                 ot_document *doc, uint32_t version, const ot_op *op,
    void *user, db_apply_cb callback) {
   assert(db);
   assert(doc);
@@ -167,6 +170,7 @@ void db_apply_op(const database *db, ot_document *doc, uint32_t version, const o
   }
   
   // First, transform the op to be current.
+  // TODO: Consider avoiding this copy if the op is current.
   ot_op op_local = *op;
   while (version < doc->version) {
     ot_op *other = (ot_op *)(doc->op_cache + doc->type->op_size * version);
@@ -174,7 +178,7 @@ void db_apply_op(const database *db, ot_document *doc, uint32_t version, const o
     version++;
   }
   
-  if (doc->type->check(doc->snapshot, op)) {
+  if (doc->type->check(doc->snapshot, &op_local)) {
     if (callback) callback("Op invalid", user, 0);
     return;
   }
@@ -187,6 +191,9 @@ void db_apply_op(const database *db, ot_document *doc, uint32_t version, const o
   doc->version++;
   
   if (callback) callback(NULL, user, doc->version);
+  
+  // And now we need to notify our listeners.
+  notify_open_submitted(doc, source, doc->version, &op_local);
 }
 
 #ifdef __BLOCKS__
@@ -196,8 +203,9 @@ static void _apply_op_b_cb(char *error, void *user, uint32_t new_version) {
   Block_release(cb);
 }
 
-void db_apply_op_b(const database *db, ot_document *doc, uint32_t version, const ot_op *op,
+void db_apply_op_b(const database *db, client *source,
+                   ot_document *doc, uint32_t version, const ot_op *op,
                    db_apply_bcb callback) {
-  db_apply_op(db, doc, version, op, (void *)Block_copy(callback), _apply_op_b_cb);
+  db_apply_op(db, source, doc, version, op, (void *)Block_copy(callback), _apply_op_b_cb);
 }
 #endif

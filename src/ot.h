@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include "text-composable.h"
 
-typedef union {
+typedef union ot_op_t {
   text_op text;
 } ot_op;
 

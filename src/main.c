@@ -34,8 +34,8 @@ int main(int argc, const char *argv[]) {
     print_doc(doc);
     
     text_op op = text_op_insert(0, (uint8_t *)"hi there");
-    db_apply_op(&db, doc, 0, (ot_op *)&op, NULL, NULL);
-    db_apply_op(&db, doc, 0, (ot_op *)&op, NULL, NULL);
+    db_apply_op(&db, NULL, doc, 0, (ot_op *)&op, NULL, NULL);
+    db_apply_op(&db, NULL, doc, 0, (ot_op *)&op, NULL, NULL);
     print_doc(doc);
   });
   
