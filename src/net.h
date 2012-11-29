@@ -35,20 +35,31 @@ void open_pair_free(open_pair *pair);
 
 enum message_type {
   // Common
-  MSG_HELLO = 0,
-  MSG_OP = 1,
-  MSG_CURSOR = 2,
+  MSG_HELLO = 1,
+  MSG_OP = 2,
+  MSG_CURSOR = 3,
   
   // Client -> server
-  MSG_OPEN = 3,
-  MSG_CLOSE = 4,
-  MSG_GET_OPS = 5,
+  MSG_OPEN = 4,
+  MSG_CLOSE = 5,
+  MSG_GET_OPS = 6,
   
   // Server -> client
-  MSG_OP_APPLIED = 6,
+  MSG_OP_APPLIED = 7,
   
+  
+  // C->S this means you need a fresh copy of the snapshot.
+  // S->C the packet contains a document snapshot.
+  MSG_FLAG_SNAPSHOT = 0x10,
+  
+  // C->S this means the document to open should be created if it doesn't already exist.
+  // S->C this means the document being opened is brand new.
   MSG_FLAG_CREATE = 0x20,
+  
+  // S->C this means that instead of containing actual data, this packet has a string error message.
   MSG_FLAG_ERROR = 0x40,
+  
+  // This packet replaces the currently active docname.
   MSG_FLAG_HAS_DOC_NAME = 0x80,
 };
 

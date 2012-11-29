@@ -4,15 +4,18 @@ buffer = binary.writeBuffer()
 {EventEmitter} = require 'events'
 
 # Mirrors src/net.h
-MSG_HELLO = 0
-MSG_OP = 1
-MSG_CURSOR = 2
+MSG_HELLO = 1
+MSG_OP = 2
+MSG_CURSOR = 3
 
-MSG_OPEN = 3
-MSG_CLOSE = 4
-MSG_GET_OPS = 5
+MSG_OPEN = 4
+MSG_CLOSE = 5
+MSG_GET_OPS = 6
 
-MSG_OP_APPLIED = 6
+MSG_OP_APPLIED = 7
+
+MSG_FLAG_SNAPSHOT = 0x10
+MSG_FLAG_CREATE = 0x20
 
 MSG_FLAG_ERROR = 0x40
 MSG_FLAG_HAS_DOC_NAME = 0x80
