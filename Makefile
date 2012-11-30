@@ -29,7 +29,7 @@ $(LIBOT)/libot.a:
 	$(MAKE) -C $(LIBOT) libot.a
 
 # You may have to compile uv using CFLAGS=-emit-llvm
-sharedb: $(LIBUV)/uv.a $(LIBOT)/libot.a $(SOURCES:%.c=%.o)
+sharedb: $(LIBUV)/libuv.a $(LIBOT)/libot.a $(SOURCES:%.c=%.o)
 	$(CC) $(CFLAGS) $(LIBS) $+ -o $@
 
 # Only need corefoundation to run the tests on mac
