@@ -96,7 +96,7 @@ static void handle_open(client *client, dstr doc_name, dstr doc_type,
   });
 }
 
-void print_doc(ot_document *doc);
+//void print_doc(ot_document *doc);
 
 // Handle a MSG_OP packet.
 // Not implemented: dupIfSource
@@ -212,7 +212,6 @@ static write_req *req_for_immediate_writing_to(client *c, uint8_t type,
 bool handle_packet(client *c) {
   // I don't know if this is the best way to do this. It would be nice to avoid extra memcpys,
   // although one large memcpy is cheaper than lots of small ones.
-  bool error = false;
   
   char *data = c->packet;
   // A pointer just past the end of the packet.
@@ -307,9 +306,9 @@ bool handle_packet(client *c) {
         }
         client_write(c, req);
         
-        db_get_b(c->db, doc_name, ^(char *error, ot_document *doc) {
-          if (doc) print_doc(doc);
-        });
+//        db_get_b(c->db, doc_name, ^(char *error, ot_document *doc) {
+//          if (doc) print_doc(doc);
+//        });
         
       });
       data = end;
@@ -326,7 +325,7 @@ bool handle_packet(client *c) {
     default:
       // Invalid data.
       fprintf(stderr, "Invalid packet - unexpected type %d\n", type);
-      error = true;
+      return true;
   }
   
   if (data != end) {
@@ -335,7 +334,7 @@ bool handle_packet(client *c) {
     //    return true;
   }
   
-  return error;
+  return false;
 }
 
 void notify_open_submitted(ot_document *doc, client *source, uint32_t version, ot_op *op) {
