@@ -1,0 +1,17 @@
+{
+  "name": "share-proxy",
+  "version": "0.0.0",
+  "description": "ERROR: No README.md file found!",
+  "main": "proxy.coffee",
+  "dependencies": {
+    "browserchannel": "~0.4.2",
+    "connect": "~2.7.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": "",
+  "author": "",
+  "license": "BSD"
+}
