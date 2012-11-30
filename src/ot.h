@@ -1,6 +1,7 @@
 #ifndef share_ot_h
 #define share_ot_h
 
+#include <sys/types.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include "text.h"
