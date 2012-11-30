@@ -10,3 +10,5 @@ Build
 *.dSYM
 *.xcworkspace
 xcuserdata
+sharedb
+node_modules
