@@ -1,6 +1,5 @@
 net = require 'net'
 binary = require './binary'
-buffer = binary.writeBuffer()
 {EventEmitter} = require 'events'
 
 # Mirrors src/net.h
@@ -25,11 +24,6 @@ PROTOCOL_VERSION = 0
 OP_COMPONENT_SKIP = 1
 OP_COMPONENT_INSERT = 3
 OP_COMPONENT_DELETE = 4
-
-buffer.flush = ->
-  data = buffer.data()
-  data.writeUInt32LE data.length - 4, 0
-  data
 
 readSnapshot = (packet, type) ->
   throw new Error "Don't know how to read snapshots of type #{type}" unless type is 'text'
@@ -61,8 +55,11 @@ connect = (port, host, cb) ->
   sDocName = null
   cDocName = null
 
+  c = new EventEmitter
+  client = net.connect port, host
+
   preparePacket = (type, docName) ->
-    buffer.reset()
+    buffer = binary.writeBuffer()
     # Skip the packet length part of the packet for now. We'll fill it in later.
     buffer.uint32 0
  
@@ -72,68 +69,92 @@ connect = (port, host, cb) ->
       buffer.zstring docName
     else
       buffer.uint8 type
+    buffer
 
-  c = new EventEmitter
-  client = net.connect port, host, ->
-    c.open = (docName, type, callback) ->
-      [type, callback] = [null, type] if typeof type is 'function'
-      console.log "trying to open #{docName}, type: #{type}"
+  writePacket = (buffer) ->
+    data = buffer.data()
+    data.writeUInt32LE data.length - 4, 0
+    client.write data
 
-      flags = MSG_FLAG_SNAPSHOT | if type then MSG_FLAG_CREATE else 0
-      preparePacket MSG_OPEN | flags, docName
-      buffer.zstring if type then type else ''
-      buffer.uint32 0xffffffff # uint32_max for the version
-      client.write buffer.flush()
+  client.on 'connect', ->
+    c.emit 'connect'
+    cb? null, c
+    cb = null
 
-      listener = (error, openedDoc, v, type, snapshot) ->
-        if openedDoc isnt docName
-          c.once 'open', listener
-        else
-          callback error, v, type, snapshot
+  client.on 'error', (e) ->
+    c.emit 'error'
+    cb? e
+    cb = null
 
-      c.once 'open', listener
+  closed = false
+  c.close = ->
+    # This doesn't guarantee that we'll stop getting messages.
+    closed = true
+    client.end()
 
-    c.sendOp = (docName, version, op, callback) ->
-      console.log 'submitting op', op
+  # This should be sent immediately.
+  c.auth = ->
+    p = preparePacket MSG_HELLO
+    p.uint8 PROTOCOL_VERSION
+    writePacket p
+    console.log 'said hi'
 
-      preparePacket MSG_OP, docName
-      buffer.uint32 version
-      buffer.uint16 op.length
-      for o in op
-        if typeof o is 'number'
-          buffer.uint8 1
-          buffer.uint32 o
-        else if typeof o is 'string'
-          buffer.uint8 3
-          buffer.zstring o
-        else if o.d?
-          buffer.uint8 4
-          buffer.uint32 o.d
-        else
-          throw new Error "Invalid op component: #{o}"
+  # opts can contain type (string), snapshot (bool) and create (bool)
+  c.open = (docName, opts, callback) ->
+    [opts, callback] = [{}, opts] if typeof opts is 'function'
 
-      client.write buffer.flush()
+    console.log "trying to open #{docName}, type: #{opts.type}"
 
-    c.close = (docName, callback) ->
-      preparePacket MSG_CLOSE, docName
-      client.write buffer.flush()
+    flags = 0
+    flags |= MSG_FLAG_SNAPSHOT if opts.snapshot
+    flags |= MSG_FLAG_CREATE if opts.create
 
-      listener = (error, doc) ->
-        if doc isnt docName
-          c.once 'close', listener
-        else
-          callback error
-      c.once 'close', listener if callback
+    p = preparePacket MSG_OPEN | flags, docName
+    p.zstring opts.type || ''
+    p.uint32 0xffffffff # uint32_max for the version
+    writePacket p
 
+    listener = (error, openedDoc, data) ->
+      if openedDoc isnt docName
+        c.once 'open', listener
+      else
+        callback error, data
 
-    cb null, c
+    c.once 'open', listener if callback
 
-  # Send a hello message immediately.
-  preparePacket MSG_HELLO
-  buffer.uint8 PROTOCOL_VERSION
-  client.write buffer.flush()
+  c.sendOp = (docName, version, op, callback) ->
+    console.log 'submitting op', op
+
+    p = preparePacket MSG_OP, docName
+    p.uint32 version
+    p.uint16 op.length
+    for o in op
+      if typeof o is 'number'
+        p.uint8 1
+        p.uint32 o
+      else if typeof o is 'string'
+        p.uint8 3
+        p.zstring o
+      else if o.d?
+        p.uint8 4
+        p.uint32 o.d
+      else
+        throw new Error "Invalid op component: #{o}"
+
+    writePacket p
+
+  c.close = (docName, callback) ->
+    writePacket preparePacket MSG_CLOSE, docName
+
+    listener = (error, doc) ->
+      if doc isnt docName
+        c.once 'close', listener
+      else
+        callback error
+    c.once 'close', listener if callback
 
   client.on 'data', require('./buffer') (b) ->
+    return if closed # Don't want to emit any data after close() is called
     packet = binary.read b
     type = packet.uint8()
     flags = type & 0xf0
@@ -155,11 +176,15 @@ connect = (port, host, cb) ->
       when MSG_OPEN
         return c.emit 'open', error, sDocName if error
 
-        v = packet.uint32()
+        data =
+          create: !!(flags & MSG_FLAG_CREATE)
+          v: packet.uint32()
+
         if flags & MSG_FLAG_SNAPSHOT
-          type = packet.zstring()
-          snapshot = readSnapshot(packet, type)
-        c.emit 'open', null, sDocName, v, type, snapshot
+          data.type = packet.zstring()
+          data.snapshot = readSnapshot packet, data.type
+
+        c.emit 'open', null, sDocName, data
 
       when MSG_CLOSE
         c.emit 'close', error, sDocName
@@ -181,26 +206,7 @@ connect = (port, host, cb) ->
       else
         console.log "Unhandled type #{type}"
 
-  client.on 'error', (e) ->
-    cb e
+  c
 
-s = connect null, (error, c) ->
-  return console.error "Error: '#{error}'" if error
-  docName = 'hi2'
-  c.open docName, 'text', (e, v, type, snapshot) ->
-    return console.log "error opening document: #{e}" if e
-    console.log "opened #{docName} at version #{v} type #{type} snapshot '#{snapshot}'"
-
-    c.sendOp docName, v, ["#{v} "]
-
-    c.close docName
-
-  c.on 'op applied', (e, docName, v) ->
-    return console.error "Could not apply op: #{e}" if e
-    console.log "op applied on #{docName} -> version #{v}"
-
-  c.on 'op', (e, docName, v, op) ->
-    console.log "Got an op on #{docName}. Now at v#{v}"
-    console.log op
-
+module.exports = connect
 
