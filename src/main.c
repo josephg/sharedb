@@ -24,25 +24,10 @@ int main(int argc, const char *argv[]) {
   database db;
   db_init(&db);
   
-  dstr docName = dstr_new("hi");
-  db_create(&db, docName, &text_composable, NULL, NULL);
-  db_get_b(&db, docName, ^(char *error, ot_document *doc) {
-    if (error) {
-      printf("Error getting document: %s\n", error);
-      return;
-    }
-    print_doc(doc);
-    
-    text_op op = text_op_insert(0, (uint8_t *)"hi there");
-    db_apply_op(&db, NULL, doc, 0, (ot_op *)&op, NULL, NULL);
-    db_apply_op(&db, NULL, doc, 0, (ot_op *)&op, NULL, NULL);
-    print_doc(doc);
-  });
-  
-  dstr_release(docName);
-  
   uv_loop_t *loop = uv_default_loop();
   net_listen(&db, loop, 8766);
+  
+  printf("Listening on port 8766");
   
   db_free(&db);
 }

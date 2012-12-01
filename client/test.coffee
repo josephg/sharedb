@@ -3,7 +3,9 @@
 connect = require './client'
 
 
-c = connect null, -> console.log 'connected'
+c = connect null, (err) ->
+  console.error err if err
+  console.log 'connected'
 console.log c
 
 docName = 'hi2'

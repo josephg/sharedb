@@ -23,9 +23,11 @@ webserver.use browserChannel opts, (client) ->
   server.on 'close', ->
     console.log 'server closed'
     client.close()
-  server.on 'error', ->
-    console.log 'server died'
-    client.close()
+  server.on 'error', (e) ->
+    console.log "server died: #{e}"
+    client.stop ->
+      console.log 'xxxx'
+      client.close()
 
   clientDoc = null
   client.on 'message', (data) ->
@@ -77,5 +79,5 @@ webserver.use browserChannel opts, (client) ->
    
 
 
-webserver.listen '8000'
-console.log 'Listening on http://localhost:8000/'
+webserver.listen 7000
+console.log 'Listening on http://localhost:7000/'

@@ -88,7 +88,7 @@ connect = (port, host, cb) ->
     cb = null
 
   client.on 'error', (e) ->
-    c.emit 'error'
+    c.emit 'error', e
     cb? e
     cb = null
 
