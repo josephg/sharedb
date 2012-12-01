@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		FD1C6F281622FBD40027CE5B /* libOT.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FD1C6F211622FBAF0027CE5B /* libOT.a */; };
-		FD1C6F2A1622FC2C0027CE5B /* uv.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FD1C6F291622FC2C0027CE5B /* uv.a */; };
 		FD1C6F3C1622FD1A0027CE5B /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FD1C6F381622FCB20027CE5B /* CoreFoundation.framework */; };
 		FD1C6F3E1622FD790027CE5B /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FD1C6F3D1622FD790027CE5B /* CoreServices.framework */; };
 		FD98373416631DB1006BCC26 /* db.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98372B16631DB1006BCC26 /* db.c */; };
@@ -19,6 +18,7 @@
 		FD98373B16631DDB006BCC26 /* net.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373916631DDB006BCC26 /* net.c */; };
 		FD98373D1663297B006BCC26 /* protocol.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373C1663297B006BCC26 /* protocol.c */; };
 		FD9837401663B41A006BCC26 /* buffer.c in Sources */ = {isa = PBXBuildFile; fileRef = FD98373F1663B41A006BCC26 /* buffer.c */; };
+		FDB77125166A5F4800F421C4 /* libuv.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FDB77124166A5F4800F421C4 /* libuv.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,7 +60,6 @@
 /* Begin PBXFileReference section */
 		FD1C6F051622FB860027CE5B /* sharedb */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = sharedb; sourceTree = BUILT_PRODUCTS_DIR; };
 		FD1C6F121622FBAF0027CE5B /* OT.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = OT.xcodeproj; path = ../../libot/OT.xcodeproj; sourceTree = "<group>"; };
-		FD1C6F291622FC2C0027CE5B /* uv.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = uv.a; path = ../uv.a; sourceTree = "<group>"; };
 		FD1C6F2E1622FC620027CE5B /* ev.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ev.h; sourceTree = "<group>"; };
 		FD1C6F2F1622FC620027CE5B /* ngx-queue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ngx-queue.h"; sourceTree = "<group>"; };
 		FD1C6F301622FC620027CE5B /* tree.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = tree.h; sourceTree = "<group>"; };
@@ -89,6 +88,7 @@
 		FD98373E16632A15006BCC26 /* sharedb.1 */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.man; name = sharedb.1; path = ../sharedb.1; sourceTree = "<group>"; };
 		FD98373F1663B41A006BCC26 /* buffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = buffer.c; sourceTree = "<group>"; };
 		FD9837411663B47C006BCC26 /* buffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = buffer.h; sourceTree = "<group>"; };
+		FDB77124166A5F4800F421C4 /* libuv.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libuv.a; path = ../libuv.a; sourceTree = "<group>"; };
 		FDFF086F16670A470034F972 /* protocol.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = protocol.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -100,7 +100,7 @@
 				FD1C6F3E1622FD790027CE5B /* CoreServices.framework in Frameworks */,
 				FD1C6F3C1622FD1A0027CE5B /* CoreFoundation.framework in Frameworks */,
 				FD1C6F281622FBD40027CE5B /* libOT.a in Frameworks */,
-				FD1C6F2A1622FC2C0027CE5B /* uv.a in Frameworks */,
+				FDB77125166A5F4800F421C4 /* libuv.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,7 +140,7 @@
 			children = (
 				FD1C6F2D1622FC620027CE5B /* uv-private */,
 				FD1C6F371622FC620027CE5B /* uv.h */,
-				FD1C6F291622FC2C0027CE5B /* uv.a */,
+				FDB77124166A5F4800F421C4 /* libuv.a */,
 			);
 			name = uv;
 			path = ../../libuv/include;
