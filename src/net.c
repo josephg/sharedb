@@ -7,6 +7,9 @@
 #include <stdint.h>
 #include "protocol.h"
 
+static const char *MAGIC_BYTES = "WAVE";
+static const int MAGIC_BYTES_LEN = 4;
+
 open_pair *open_pair_alloc() {
   // Object pool me
   return malloc(sizeof(open_pair));
@@ -124,6 +127,17 @@ static void got_data(uv_stream_t* stream, ssize_t nread, uv_buf_t uv_buf) {
     if (c->offset == 4) {
       // Finished reading in the packet length.
       
+      if (!c->seen_magic_bytes) {
+        // The length field should contain the magic bytes.
+        if (c->packet_length != *(int *)MAGIC_BYTES) {
+          fprintf(stderr, "Did not get magic bytes from client\n");
+          uv_close((uv_handle_t *)c, close_handle_cb);
+        } else {
+//          printf("magic!\n");
+          c->seen_magic_bytes = true;
+          c->offset = 0;
+        }
+      }
       // Big endian???
       //c->packet_length = ntohl(c->packet_length);
     }
@@ -164,6 +178,16 @@ void client_write(client *c, write_req *req) {
   uv_write(&req->write, (uv_stream_t *)&c->socket, &buf, 1, write_cb);
 }
 
+static void magic_bytes_write_cb(uv_write_t *write, int status) {
+  free(write);
+}
+
+static void write_magic_bytes(client *c) {
+  uv_buf_t buf = uv_buf_init((char *)MAGIC_BYTES, MAGIC_BYTES_LEN);
+  uv_write_t *write = malloc(sizeof(uv_write_t));
+  uv_write(write, (uv_stream_t *)&c->socket, &buf, 1, magic_bytes_write_cb);
+}
+
 // Callback for libuv's uv_listen(server, ...) method.
 static void got_connection(uv_stream_t* server, int status) {
   printf("got connection\n");
@@ -182,6 +206,8 @@ static void got_connection(uv_stream_t* server, int status) {
   assert(uv_accept(server, (uv_stream_t *)&c->socket) == 0);
   
   uv_read_start((uv_stream_t *)&c->socket, alloc_buffer, got_data);
+  
+  write_magic_bytes(c);
 }
 
 void net_listen(database *db, uv_loop_t *loop, int port) {

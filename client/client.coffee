@@ -58,6 +58,12 @@ connect = (port, host, cb) ->
   c = new EventEmitter
   client = net.connect port, host
 
+  # Send magic bytes before anything else.
+  do ->
+    buffer = binary.writeBuffer()
+    buffer.string 'WAVE'
+    client.write buffer.data()
+
   preparePacket = (type, docName) ->
     buffer = binary.writeBuffer()
     # Skip the packet length part of the packet for now. We'll fill it in later.

@@ -15,6 +15,9 @@ module.exports = (packetHandler) ->
   
   # Temporary buffer used to read in the length
   lenBuf = new Buffer 4
+
+  # For sharedb, the connection starts with 4 magic bytes ('WAVE'). We should expect these first.
+  seenMagic = false
   
   readBytes = (dest, num = dest.length) ->
     # Read num bytes from the pending buffers into dest (another buffer)
@@ -41,7 +44,12 @@ module.exports = (packetHandler) ->
       if packetLength is -1
         if bytes >= 4
           readBytes lenBuf
-          packetLength = lenBuf.readUInt32LE(0)
+          if !seenMagic
+            throw new Error 'Invalid magic' unless lenBuf.toString() is 'WAVE'
+            seenMagic = true
+          else
+            packetLength = lenBuf.readUInt32LE(0)
+
           bytes -= 4
         else
           break

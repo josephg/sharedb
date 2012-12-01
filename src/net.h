@@ -94,6 +94,9 @@ typedef struct client_t {
   // the retain count gets to 0.
   int retain_count;
   
+  // Before clients can do anything, they must first send magic bytes to the server, and then
+  // send a hello message, which authenticates them. Not actually implemented yet.
+  bool seen_magic_bytes;
   bool said_hello;
 } client;
 
