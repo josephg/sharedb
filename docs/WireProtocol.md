@@ -6,15 +6,16 @@ The wire protocol is loosely based on [ShareJS's wire protocol](https://github.c
 
 The server listens for incoming TCP connections on port 8766. (liable to change).
 
-All integers are transmitted using little endian. All strings are sent as null terminated UTF-8.
+All integers are transmitted little endian. All strings are sent as null terminated UTF-8. The server does not currently work if you run it on a big endian system.
 
-The server and client exchange a series of messages over this connection. Each message starts with:
+Immediately upon connecting, the client must first transmit the shared magic bytes (*"WAVE"*). The server will reply in kind. 
+
+Once the magic bytes have been exchanged, the server and client can send message to each other. Each message starts with:
 
 - Length (bytes) of remaining packet (uint32, little endian)
 - Message type (one byte) OR'ed with optional docName flag (0x80) and error flag (0x40). Message types are listed below. The docName flag indicates that this packet replaces the currently *in use* docName.
 - If the docName flag is set, the packet next lists the new *in use* docName (a string). The named document does not have to exist.
 - If the error flag is set, the packet contains a string error message and nothing more.
-
 
 ## Message types:
 
