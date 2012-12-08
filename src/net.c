@@ -199,7 +199,7 @@ static void got_connection(uv_stream_t* server, int status) {
   
   client *c = calloc(sizeof(client), 1);
   uv_tcp_init(uv_default_loop(), &c->socket);
-  c->db = (database *)server->data;
+  database *db = c->db = (database *)server->data;
   c->retain_count = 1;
 
   // uv_accept is guaranteed to succeed here.

@@ -57,6 +57,7 @@ connect = (port, host, cb) ->
 
   c = new EventEmitter
   client = net.connect port, host
+  id = null
 
   # Send magic bytes before anything else.
   do ->
@@ -176,8 +177,9 @@ connect = (port, host, cb) ->
         v = packet.uint8()
         if v isnt PROTOCOL_VERSION
           throw new Error "Incorrect protocol version - got #{v} expected #{PROTOCOL_VERSION}"
-        console.log 'hello message'
+        id = packet.uint32()
         c.emit 'hello'
+        c.emit 'has id', id
 
       when MSG_OPEN
         return c.emit 'open', error, sDocName if error

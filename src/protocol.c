@@ -9,6 +9,11 @@
 #include "db.h"
 #include "ot.h"
 
+// The next client id. TODO: Replace me with GUIDs or something.
+// Its dangerous when an id is reused on the same document (which could
+// happen once the server has persistance).
+static int next_id = 1000;
+
 static const uint8_t PROTOCOL_VERSION = 0;
 
 static void open_internal(client *client, ot_document *doc, uint32_t version, uint8_t flags,
@@ -265,6 +270,8 @@ bool handle_packet(client *c) {
       
       write_req *req = req_for_immediate_writing_to(c, type, NULL, NULL);
       buf_uint8(&req->buffer, PROTOCOL_VERSION);
+      c->cid = next_id++;
+      buf_uint32(&req->buffer, c->cid);
       client_write(c, req);
       break;
     }

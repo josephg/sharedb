@@ -98,6 +98,9 @@ typedef struct client_t {
   // send a hello message, which authenticates them. Not actually implemented yet.
   bool seen_magic_bytes;
   bool said_hello;
+  
+  // Client's id. The id is unique for the lifetime of the server.
+  uint32_t cid;
 } client;
 
 // Main entrypoint for the net code. Opens the network socket for incoming connections.
