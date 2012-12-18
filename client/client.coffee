@@ -190,6 +190,8 @@ connect = (port, host, cb) ->
 
         if flags & MSG_FLAG_SNAPSHOT
           data.type = packet.zstring()
+          data.ctime = packet.uint64()
+          data.mtime = packet.uint64()
           data.snapshot = readSnapshot packet, data.type
 
         c.emit 'open', null, sDocName, data

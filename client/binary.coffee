@@ -10,6 +10,12 @@ exports.read = (buffer) ->
   int16: -> buffer.readInt16LE (p 2)
   int8:  -> buffer.readInt8    (p 1)
 
+  uint64: ->
+    low = buffer.readUInt32LE (p 4)
+    high = buffer.readUInt32LE (p 4)
+    # Can't use bitwise operations here because javascript's bitwise ops
+    # truncate to 32bit integers. Otherwise this is low | high<<32
+    low + high * Math.pow(2, 32)
   uint32: -> buffer.readUInt32LE (p 4)
   uint16: -> buffer.readUInt16LE (p 2)
   uint8:  -> buffer.readUInt8    (p 1)

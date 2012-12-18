@@ -36,6 +36,8 @@ The client needs to send this packet immediately upon connecting. The server wil
 
 This packet will eventually also contain auth tokens.
 
++ This now contains a client ID (uint32) as well
+
 ### Open
 
 The open message requests that the server stream the client any operations applied to a document. This does not include the client's own operations.

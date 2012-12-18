@@ -39,10 +39,12 @@ void *_buf_insert_pos(buffer *b, size_t length);
 // Write the various numeric types. These functions all write using the native byte order, which is
 // (delightfully) little endian basically everywhere now.
 // TODO: Make this code endian-aware.
+static inline void buf_uint64(buffer *b, uint64_t value) { XX }
 static inline void buf_uint32(buffer *b, uint32_t value) { XX }
 static inline void buf_uint16(buffer *b, uint16_t value) { XX }
 static inline void buf_uint8 (buffer *b, uint8_t  value) { XX }
 
+static inline void buf_int64(buffer *b, int64_t value) { XX }
 static inline void buf_int32(buffer *b, int32_t value) { XX }
 static inline void buf_int16(buffer *b, int16_t value) { XX }
 static inline void buf_int8 (buffer *b, int8_t  value) { XX }

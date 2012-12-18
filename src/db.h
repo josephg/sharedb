@@ -38,6 +38,9 @@ typedef struct ot_document_t {
   
   open_pair *open_pair_head;
   
+  uint64_t ctime;
+  uint64_t mtime;
+  
   // op cache
   // metadata
   

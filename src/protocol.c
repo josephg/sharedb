@@ -291,6 +291,8 @@ bool handle_packet(client *c) {
           buf_uint32(&req->buffer, doc->version);
           if (flags & MSG_FLAG_SNAPSHOT) {
             buf_zstring(&req->buffer, doc->type->name);
+            buf_uint64(&req->buffer, doc->ctime);
+            buf_uint64(&req->buffer, doc->mtime);
             buf_doc(&req->buffer, doc->type, doc->snapshot);
             // Also need to add cursors.
           }

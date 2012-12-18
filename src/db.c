@@ -6,6 +6,7 @@
 #include <Block.h>
 #endif
 #include "protocol.h"
+#include <sys/time.h>
 
 /*
 static ot_document doc_add(database *db, char *name, ot_type *type, void *initial_data) {
@@ -75,6 +76,13 @@ void doc_release(ot_document *doc) {
   }
 }
 
+// Weird place for this function, but for now its only used here.
+static uint64_t get_time_ms() {
+  struct timeval time;
+  assert(gettimeofday(&time, NULL) == 0);
+  return time.tv_sec * 1000 + time.tv_usec / 1000;
+}
+
 void db_create(database *db, dstr doc_name, ot_type *type,
     void *user, db_create_cb callback) {
   assert(db);
@@ -94,6 +102,7 @@ void db_create(database *db, dstr doc_name, ot_type *type,
     doc->op_cache = malloc(type->op_size * doc->op_cache_capacity);
     doc->retain_count = 0;
     doc->open_pair_head = NULL;
+    doc->ctime = doc->mtime = get_time_ms();
     
     dictAdd(db->docs, (void *)doc_name, doc);
     if (callback) callback(NULL, doc, user);

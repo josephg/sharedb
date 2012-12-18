@@ -60,8 +60,8 @@ webserver.use browserChannel opts, (client) ->
 
   server.on 'open', (err, docName, data) ->
     return client.send doc:docName, open:false, error:err if err
-    {v, type, snapshot, create} = data
-    client.send doc:docName, open:true, v:v, snapshot:snapshot, create:create
+    {v, type, snapshot, ctime, mtime, create} = data
+    client.send doc:docName, open:true, v:v, snapshot:snapshot, create:create, ctime:ctime, mtime:mtime
 
   server.on 'op', (err, docName, v, op) ->
     console.log 'retransmitting op', doc:docName, v:v-1, op:op

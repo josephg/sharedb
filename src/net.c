@@ -199,7 +199,7 @@ static void got_connection(uv_stream_t* server, int status) {
   
   client *c = calloc(sizeof(client), 1);
   uv_tcp_init(uv_default_loop(), &c->socket);
-  database *db = c->db = (database *)server->data;
+  c->db = (database *)server->data;
   c->retain_count = 1;
 
   // uv_accept is guaranteed to succeed here.
@@ -208,19 +208,14 @@ static void got_connection(uv_stream_t* server, int status) {
   uv_read_start((uv_stream_t *)&c->socket, alloc_buffer, got_data);
 }
 
-void net_listen(database *db, uv_loop_t *loop, int port) {
-  uv_tcp_t server = {};
-  server.data = db;
-  uv_tcp_init(loop, &server);
+void net_listen(uv_tcp_t *server, database *db, uv_loop_t *loop, int port) {
+  server->data = db;
+  uv_tcp_init(loop, server);
   
   //  struct sockaddr_in addr = uv_ip4_addr("0.0.0.0", 8766);
   //  uv_tcp_bind(&server, addr);
   struct sockaddr_in6 addr6 = uv_ip6_addr("::", 8766);
-  uv_tcp_bind6(&server, addr6);
+  uv_tcp_bind6(server, addr6);
   
-  uv_listen((uv_stream_t *)&server, 128, got_connection);
-  
-  uv_set_process_title("shared");
-  
-  uv_run(loop);
+  uv_listen((uv_stream_t *)server, 128, got_connection);
 }

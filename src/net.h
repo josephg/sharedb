@@ -104,7 +104,7 @@ typedef struct client_t {
 } client;
 
 // Main entrypoint for the net code. Opens the network socket for incoming connections.
-void net_listen(struct database_t *db, struct uv_loop_s *loop, int port);
+void net_listen(uv_tcp_t *server, struct database_t *db, uv_loop_t *loop, int port);
 
 static inline void client_retain(client *client) {
   client->retain_count++;
