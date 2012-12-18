@@ -77,7 +77,7 @@ void doc_release(ot_document *doc) {
 }
 
 // Weird place for this function, but for now its only used here.
-static uint64_t get_time_ms() {
+static uint64_t time_ms() {
   struct timeval time;
   assert(gettimeofday(&time, NULL) == 0);
   return time.tv_sec * 1000 + time.tv_usec / 1000;
@@ -102,7 +102,7 @@ void db_create(database *db, dstr doc_name, ot_type *type,
     doc->op_cache = malloc(type->op_size * doc->op_cache_capacity);
     doc->retain_count = 0;
     doc->open_pair_head = NULL;
-    doc->ctime = doc->mtime = get_time_ms();
+    doc->ctime = doc->mtime = time_ms();
     
     dictAdd(db->docs, (void *)doc_name, doc);
     if (callback) callback(NULL, doc, user);
@@ -198,6 +198,8 @@ void db_apply_op(const database *db, client *source,
   add_op_to_cache(doc, &op_local);
   
   doc->version++;
+  
+  doc->mtime = time_ms();
   
   if (callback) callback(NULL, user, doc->version);
   
