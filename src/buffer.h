@@ -29,6 +29,8 @@ static inline void buf_reset(buffer *b) {
   b->pos = b->length = 0;
 }
 
+#pragma mark Writing functions
+
 void *_buf_insert_pos(buffer *b, size_t length);
 
 #define XX *(typeof(value) *)_buf_insert_pos(b, sizeof(value)) = value;
@@ -63,5 +65,29 @@ static inline void buf_zstring_dstr(buffer *b, dstr str) {
 static inline void buf_zstring_rope(buffer *b, rope *rope) {
   rope_write_cstr(rope, _buf_insert_pos(b, rope_byte_count(rope)));
 }
+
+#pragma mark Reading functions
+
+void *_buf_read_pos(buffer *b, size_t len);
+#define DEF_READ(type) \
+static inline type##_t buf_read_##type(buffer *b, bool *err) { \
+  void *ptr = _buf_read_pos(b, sizeof(type##_t)); \
+  return ptr == NULL ? *err=true,(type##_t)-1 : *(type##_t *)ptr; \
+}
+
+DEF_READ(uint64)
+DEF_READ(uint32)
+DEF_READ(uint16)
+DEF_READ(uint8)
+
+DEF_READ(int64)
+DEF_READ(int32)
+DEF_READ(int16)
+DEF_READ(int8)
+
+#undef DEF_READ
+
+// Returns null on error
+dstr buf_read_zstring(buffer *b);
 
 #endif

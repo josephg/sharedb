@@ -47,3 +47,26 @@ void buf_bytes(buffer *b, void *bytes, size_t num) {
   void *start = _buf_insert_pos(b, num);
   memcpy(start, bytes, num);
 }
+
+void *_buf_read_pos(buffer *b, size_t len) {
+  if (b->pos + len > b->length) {
+    b->pos = b->length;
+    return NULL;
+  } else {
+    void *ptr = &b->bytes[b->pos];
+    b->pos += len;
+    return ptr;
+  }
+}
+
+dstr buf_read_zstring(buffer *b) {
+  char *data = &b->bytes[b->pos];
+  size_t len = strnlen(data, b->length - b->pos);
+  if (len == b->length - b->pos) {
+    return NULL;
+  } else {
+    dstr str = dstr_new2(data, len);
+    b->pos += len + 1; // Also skip the \0
+    return str;
+  }
+}

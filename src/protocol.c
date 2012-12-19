@@ -109,16 +109,20 @@ static void handle_open(client *client, dstr doc_name, dstr doc_type,
 
 // Handle a MSG_OP packet.
 // Not implemented: dupIfSource
-static void handle_op(client *client, uint32_t version, char *op_data, size_t op_data_size,
+static void handle_op(client *client, uint32_t version, buffer *packet,
       void (^callback)(char *error, uint32_t new_version)) {
   // Inside the block below, the packet data won't be valid anymore. I can't parse it now because
   // I don't know what the data type is until the block (below), by which time the packet itself
   // might have been rewritten with new data over the wire. I'll copy it to a stack-local buffer
   // This won't work with VSC - but thats a bridge to cross when we get to it.
-  char op_buffer[op_data_size];
-  memcpy(op_buffer, op_data, op_data_size);
   
-  // I don't know why I need to do this, or if there are dragons involved.
+  // The whole rest of the packet is op data.
+  size_t op_data_size = packet->length - packet->pos;
+  char op_buffer[op_data_size];
+  memcpy(op_buffer, &packet->bytes[packet->pos], op_data_size);
+  packet->pos = packet->length;
+  
+  // I get a compiler error without this. Dragons!
   char *b = op_buffer;
   
   db_get_b(client->db, client->client_doc_name, ^(char *error, ot_document *doc) {
@@ -166,21 +170,6 @@ static bool read_bytes(void *dest, void *src, void *end, size_t length) {
   return false;
 }
 
-static dstr read_string(char **src, char *end) {
-  char *data = *src;
-  size_t len = strnlen(data, end - data);
-  if (len == end - data) {
-    fprintf(stderr, "Not enough bytes left for the string!\n");
-    return NULL;
-  } else {
-    dstr str = dstr_new2(data, len);
-    *src += len + 1; // Also skip the \0
-    return str;
-  }
-}
-
-#define READ_INT32(dest) if(end - data < 4) return true; dest = *(int *)data; data += 4
-
 // This creates and returns a write request that must be sent to client_write before
 // the main loop resumes.
 static write_req *req_for_immediate_writing_to(client *c, uint8_t type,
@@ -222,12 +211,11 @@ bool handle_packet(client *c) {
   // I don't know if this is the best way to do this. It would be nice to avoid extra memcpys,
   // although one large memcpy is cheaper than lots of small ones.
   
-  char *data = c->packet;
-  // A pointer just past the end of the packet.
-  char *end = c->packet + c->packet_length;
+  buffer packet = {c->packet, c->packet_length, 0};
   
-  if (data == end) return true;
-  uint8_t type = *(data++);
+  bool err;
+  uint8_t type = buf_read_int8(&packet, &err);
+  if (err) return true;
   
   uint8_t flags = type & 0xf0;
   type &= 0xf;
@@ -238,7 +226,7 @@ bool handle_packet(client *c) {
     if (c->client_doc_name) {
       dstr_release(c->client_doc_name);
     }
-    c->client_doc_name = read_string(&data, end);
+    c->client_doc_name = buf_read_zstring(&packet);
     if (c->client_doc_name == NULL) {
       return true;
     }
@@ -262,7 +250,8 @@ bool handle_packet(client *c) {
         // Repeated hellos = error.
         return true;
       }
-      unsigned char p_version = *(data++);
+      unsigned char p_version = buf_read_uint8(&packet, &err);
+      if (err) return true;
       if (p_version != PROTOCOL_VERSION) {
         // The protocol version is currently 1.
         fprintf(stderr, "Wrong protocol version - was %d expected %d\n",
@@ -281,12 +270,10 @@ bool handle_packet(client *c) {
     }
     case MSG_OPEN: {
       dstr doc_name = dstr_retain(c->client_doc_name);
-      if (data == end) return true;
-      uint8_t open_flags = *(data++);
-      dstr doc_type = read_string(&data, end); // an empty string if the type isn't specified.
-      if (doc_type == NULL) return true;
-      uint32_t version;
-      READ_INT32(version); // UINT32_MAX means 'use the current version'.
+      uint8_t open_flags = buf_read_uint8(&packet, &err);
+      dstr doc_type = buf_read_zstring(&packet); // an empty string if the type isn't specified.
+      uint32_t version = buf_read_uint32(&packet, &err); // Or UINT32_MAX (use the current version)
+      if (doc_type == NULL || err) return true;
       client_retain(c);
       handle_open(c, doc_name, doc_type, version, open_flags,
                   ^(char *error, ot_document *doc, uint8_t open_flags) {
@@ -295,14 +282,14 @@ bool handle_packet(client *c) {
         dstr_release(doc_type);
         write_req *cursor_req = NULL;
         if (!error) {
-          buf_uint8(&req->buffer, open_flags);
-          buf_uint32(&req->buffer, doc->version);
+          buffer *b = &req->buffer;
+          buf_uint8(b, open_flags);
+          buf_uint32(b, doc->version);
           if (open_flags & OPEN_FLAG_SNAPSHOT) {
-            buf_zstring(&req->buffer, doc->type->name);
-            buf_uint64(&req->buffer, doc->ctime);
-            buf_uint64(&req->buffer, doc->mtime);
-            doc->type->write_doc(doc->snapshot, &req->buffer);
-            // Also need to add cursors.
+            buf_zstring(b, doc->type->name);
+            buf_uint64(b, doc->ctime);
+            buf_uint64(b, doc->mtime);
+            doc->type->write_doc(doc->snapshot, b);
           }
           
           // If I want to make the packet system more complex, I could just append the cursor
@@ -330,11 +317,9 @@ bool handle_packet(client *c) {
       break;
     }
     case MSG_OP: {
-      uint32_t version;
-      READ_INT32(version);
-      size_t op_size = end - data;
+      uint32_t version = buf_read_uint32(&packet, &err);
       dstr doc_name = dstr_retain(c->client_doc_name);
-      handle_op(c, version, data, op_size, ^(char *error, uint32_t applied_at) {
+      handle_op(c, version, &packet, ^(char *error, uint32_t applied_at) {
         write_req *req = req_for_immediate_writing_to(c, MSG_OP_ACK, doc_name, error);
         dstr_release(doc_name);
         if (!error) {
@@ -347,7 +332,6 @@ bool handle_packet(client *c) {
 //        });
         
       });
-      data = end;
       break;
     }
     case MSG_CLOSE: {
@@ -367,10 +351,8 @@ bool handle_packet(client *c) {
       return true;
   }
   
-  if (data != end) {
-    fprintf(stderr, "%ld trailing bytes on packet type %d\n", end - data, type);
-    //    read_bytes(c, NULL, c->num_bytes - expected_remaining_bytes);
-    //    return true;
+  if (packet.pos != packet.length) {
+    fprintf(stderr, "%d trailing bytes on packet type %d\n", packet.length - packet.pos, type);
   }
   
   return false;
