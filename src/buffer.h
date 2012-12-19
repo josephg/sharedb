@@ -67,5 +67,6 @@ static inline void buf_zstring_rope(buffer *b, rope *rope) {
 
 void buf_op(buffer *b, ot_type *type, ot_op *op);
 void buf_doc(buffer *b, ot_type *type, void *snapshot);
+void buf_cursor(buffer *b, ot_type *type, ot_cursor cursor);
 
 #endif

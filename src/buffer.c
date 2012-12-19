@@ -55,3 +55,7 @@ void buf_op(buffer *b, ot_type *type, ot_op *op) {
 void buf_doc(buffer *b, ot_type *type, void *snapshot) {
   type->write_doc(snapshot, buf_write_fn, b);
 }
+
+void buf_cursor(buffer *b, ot_type *type, ot_cursor cursor) {
+  type->write_cursor(cursor, buf_write_fn, b);
+}

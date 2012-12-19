@@ -293,6 +293,7 @@ bool handle_packet(client *c) {
         write_req *req = req_for_immediate_writing_to(c, MSG_OPEN, doc_name, error);
         dstr_release(doc_name);
         dstr_release(doc_type);
+        write_req *cursor_req = NULL;
         if (!error) {
           buf_uint8(&req->buffer, open_flags);
           buf_uint32(&req->buffer, doc->version);
@@ -303,8 +304,27 @@ bool handle_packet(client *c) {
             buf_doc(&req->buffer, doc->type, doc->snapshot);
             // Also need to add cursors.
           }
+          
+          // If I want to make the packet system more complex, I could just append the cursor
+          // data on the end of the open response.
+          if (open_flags & OPEN_FLAG_TRACK_CURSORS) {
+            cursor_req = req_for_immediate_writing_to(c, MSG_CURSOR | MSG_CURSOR_REPLACE_ALL,
+                                                      doc_name, NULL);
+            buffer *b = &cursor_req->buffer;
+            for (open_pair *pair = doc->open_pair_head; pair; pair = pair->next_client) {
+              if (pair->client != c && pair->has_cursor) { // && within timeout?
+                buf_uint32(b, pair->client->cid);
+                // & client name
+                buf_cursor(b, doc->type, pair->cursor);
+              }
+            }
+            buf_uint32(b, 0);
+          }
         }
         client_write(c, req);
+        if (cursor_req) {
+          client_write(c, cursor_req);
+        }
         client_release(c);
       });
       break;
@@ -337,6 +357,9 @@ bool handle_packet(client *c) {
       client_write(c, req);
       break;
     }
+    case MSG_CURSOR: {
+      
+    }
       
     default:
       // Invalid data.
@@ -353,7 +376,7 @@ bool handle_packet(client *c) {
   return false;
 }
 
-void notify_open_submitted(ot_document *doc, client *source, uint32_t version, ot_op *op) {
+void broadcast_op_to_clients(ot_document *doc, client *source, uint32_t version, ot_op *op) {
   // TODO: Speed this up by only serializing the op once, and copy the serialized bytes to each
   // subsequent client.
   for (open_pair *pair = doc->open_pair_head; pair; pair = pair->next_client) {

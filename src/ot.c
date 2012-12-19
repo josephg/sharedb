@@ -29,6 +29,10 @@ void write_doc_tc(void *doc, write_fn write, void *user) {
   write(&zero, 1, user);
 }
 
+void write_cursor_tc(ot_cursor cursor, write_fn write, void *user) {
+  write(&cursor.pos, sizeof(uint32_t), user);
+}
+
 static int check_tc(void *doc, const ot_op *op) {
   return text_op_check((rope *)doc, &op->text);
 }
@@ -63,6 +67,8 @@ const ot_type text_composable = {
   write_op_tc,
   
   write_doc_tc,
+  
+  write_cursor_tc,
   
   check_tc,
   apply_tc,

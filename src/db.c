@@ -204,7 +204,7 @@ void db_apply_op(const database *db, client *source,
   if (callback) callback(NULL, user, doc->version);
   
   // And now we need to notify our listeners.
-  notify_open_submitted(doc, source, doc->version, &op_local);
+  broadcast_op_to_clients(doc, source, doc->version, &op_local);
 }
 
 #ifdef __BLOCKS__

@@ -33,10 +33,13 @@ struct _ot_type {
   // Write an op to a byte stream. This could take a pointer to a buffer instead.. Eh.
   void (*write_op)(ot_op *op, write_fn write, void *user);
   
-  // Read fn should be here.
+  // Read doc fn.
   
   // Write a document to a byte stream.
   void (*write_doc)(void *doc, write_fn write, void *user);
+  
+  // Read cursor fn
+  void (*write_cursor)(ot_cursor cursor, write_fn write, void *user);
   
   int (*check)(void *doc, const ot_op *op);
   void (*apply)(void *doc, ot_op *op);

@@ -54,6 +54,11 @@ enum message_type {
   
   // Server -> client
   MSG_OP_ACK = 7,
+
+  // For cursor messages, we use these couple bits to set what kind of cursor data op it is.
+  MSG_CURSOR_SET = 0x10,
+  MSG_CURSOR_REMOVE = 0x20,
+  MSG_CURSOR_REPLACE_ALL = 0x30,
   
   // S->C this means that instead of containing actual data, this packet has a string error message.
   MSG_FLAG_ERROR = 0x40,
