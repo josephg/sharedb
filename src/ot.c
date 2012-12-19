@@ -54,6 +54,7 @@ static void transform_tc(ot_op *result_out, ot_op *op1, ot_op *op2, bool isLeft)
 const ot_type text_composable = {
   "text",
   sizeof(text_op),
+  sizeof(uint32_t), // Cursor size (cursors are ints)
   
   create_tc, // Create
   free_tc,

@@ -44,13 +44,16 @@ The open message requests that the server stream the client any operations appli
 
 An open document can be closed using the `close` message.
 
-Open messages have two optional flags: _snapshot_ and _create_. These flags are OR'ed with the message type field.
-- The _snapshot_ flag (`0x10`) indicates that the server should send the client a copy of the current document snapshot.
-- The _create_ flag (`0x20`) indicates that the server should create the document if it does not already exist.
-
 After the regular packet header, the open request contains the following fields:
+- (*byte*) **Open flags**. See below for details.
 - (*string*) Requested **docType**, or an empty string. If the create flag is set, this is the type of the created document. If the document already exists in the database but has a different type, a *Type mismatch* error is returned.
 - (*uint32*) Document opening **version**. This is the version from which the server will stream operations to the client. Any operations between the requested version and the current version will be sent to the client immediately after the document is open as if they were new operations. If you don't care about the version (for example, you're creating a new document or you want a document snapshot), pass `UINT32_MAX` in the version field.
+
+The open flags byte can contain:
+- The _snapshot_ flag (`0x1`) indicates that the server should send the client a copy of the current document snapshot.
+- The _create_ flag (`0x2`) indicates that the server should create the document if it does not already exist.
+- The _track cursors_ flag (`0x4`) indicates the client should be told about user cursors in the document. See the section on cursors.
+- The _has cursor_ flag (`0x8`) tells the server to place a cursor for this client in the document.
 
 Practically, open requests usually come in one of 2 forms:
 
@@ -58,6 +61,16 @@ Practically, open requests usually come in one of 2 forms:
 - You already have a cached document snapshot. Pass no flags. Send the known type & version number in the open request. The client should automatically catch up to the current document version.
 
 Open requests can also be combined with `create` messages. In this case, the server will automatically create the document if it does not exist. In this case, the type must be specified.
+
+An open request is always followed by an **open response**. The open response contains:
+
+- (*byte*) **Open flags**. In a response, these flags indicate whether a snapshot is being given to the client and whether the document was actually created.
+- (*uint32*) Open **version**. This is the version at which the client has opened the document. If the server is storing the document at a more recent version, the intervening operations will be sent to the client in the normal way after the open response.
+- If the open response has the *snapshot flag* set (0x1), the open response then contains a document snapshot. This contains:
+-- (*string*) **docType**: This is `text` for text documents.
+-- (*uint64*) **ctime**: The document's creation time, given in MS since the epoch.
+-- (*uint64*) **mtime**: The document's last modified time, given in MS since the epoch.
+-- (*doc*) The actual document. The format of this data is type-dependant. Text documents are sent as a null-terminated string.
 
 Errors:
 

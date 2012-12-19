@@ -22,6 +22,8 @@ typedef struct open_doc_pair_t {
   struct client_t *client;
   struct ot_document_t *doc;
   
+  bool tracks_cursors;
+  
   // The next open_doc for this client
   struct open_doc_pair_t *next;
   
@@ -50,20 +52,26 @@ enum message_type {
   // Server -> client
   MSG_OP_ACK = 7,
   
-  
-  // C->S this means you need a fresh copy of the snapshot.
-  // S->C the packet contains a document snapshot.
-  MSG_FLAG_SNAPSHOT = 0x10,
-  
-  // C->S this means the document to open should be created if it doesn't already exist.
-  // S->C this means the document being opened is brand new.
-  MSG_FLAG_CREATE = 0x20,
-  
   // S->C this means that instead of containing actual data, this packet has a string error message.
   MSG_FLAG_ERROR = 0x40,
   
   // This packet replaces the currently active docname.
   MSG_FLAG_HAS_DOC_NAME = 0x80,
+};
+
+enum open_flags {
+  // C->S this means you need a fresh copy of the snapshot.
+  // S->C the packet contains a document snapshot.
+  OPEN_FLAG_SNAPSHOT = 0x1,
+
+  // C->S this means the document to open should be created if it doesn't already exist.
+  // S->C this means the document being opened is brand new.
+  OPEN_FLAG_CREATE = 0x2,
+
+  // C->S this indiciates the client wants to know about all user cursors in the document.
+  OPEN_FLAG_TRACK_CURSORS = 0x4,
+  // C->S this means the client's cursor should be visible to other users.
+  OPEN_FLAG_HAS_CURSOR = 0x8,
 };
 
 typedef struct client_t {

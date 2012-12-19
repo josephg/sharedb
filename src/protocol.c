@@ -16,8 +16,8 @@ static int next_id = 1000;
 
 static const uint8_t PROTOCOL_VERSION = 0;
 
-static void open_internal(client *client, ot_document *doc, uint32_t version, uint8_t flags,
-                          void (^callback)(char *error, ot_document *doc, uint8_t flags)) {
+static void open_internal(client *client, ot_document *doc, uint32_t version, uint8_t open_flags,
+                          void (^callback)(char *error, ot_document *doc, uint8_t open_flags)) {
   // Make sure the doc isn't already open.
   for (open_pair *o = client->open_docs_head; o; o = o->next) {
     if (o->doc == doc) {
@@ -35,6 +35,8 @@ static void open_internal(client *client, ot_document *doc, uint32_t version, ui
   open_pair *pair = open_pair_alloc();
   pair->client = client;
   pair->doc = doc;
+  pair->tracks_cursors = true; // Make me based on flags passed in the open request
+  
   pair->next = client->open_docs_head;
   client->open_docs_head = pair;
   
@@ -45,17 +47,17 @@ static void open_internal(client *client, ot_document *doc, uint32_t version, ui
   pair->prev_client = NULL;
   doc->open_pair_head = pair;
   
-  if (callback) callback(NULL, doc, flags);
+  if (callback) callback(NULL, doc, open_flags);
 }
 
 // It might make more sense to put this function into db.h.
 static void handle_open(client *client, dstr doc_name, dstr doc_type,
-                        uint32_t version, uint8_t flags,
+                        uint32_t version, uint8_t open_flags,
                         void (^callback)(char *error, ot_document *doc, uint8_t flags)) {
   printf("Open '%s'\n", doc_name);
   
   db_get_b(client->db, doc_name, ^(char *error, ot_document *doc) {
-    if (flags & MSG_FLAG_CREATE && error && strcmp(error, "Doc does not exist") == 0) {
+    if (open_flags & OPEN_FLAG_CREATE && error && strcmp(error, "Doc does not exist") == 0) {
       // Create it.
       ot_type *type = ot_type_with_name(doc_type);
       if (type == NULL) {
@@ -69,7 +71,7 @@ static void handle_open(client *client, dstr doc_name, dstr doc_type,
           return;
         }
         
-        open_internal(client, doc, doc->version, flags, callback);
+        open_internal(client, doc, doc->version, open_flags, callback);
       });
       return;
     } else if (error) {
@@ -83,7 +85,7 @@ static void handle_open(client *client, dstr doc_name, dstr doc_type,
       return;
     }
     
-    if (version != UINT32_MAX && flags & MSG_FLAG_SNAPSHOT) {
+    if (version != UINT32_MAX && open_flags & OPEN_FLAG_SNAPSHOT) {
       if (callback) callback("Cannot fetch historical snapshots", NULL, 0);
       return;
     }
@@ -96,7 +98,7 @@ static void handle_open(client *client, dstr doc_name, dstr doc_type,
     
     open_internal(client, doc,
                   version == UINT32_MAX ? doc->version : version,
-                  flags & ~MSG_FLAG_CREATE,
+                  open_flags & ~OPEN_FLAG_CREATE,
                   callback);
   });
 }
@@ -223,7 +225,7 @@ bool handle_packet(client *c) {
   char *end = c->packet + c->packet_length;
   
   if (data == end) return true;
-  unsigned char type = *(data++);
+  uint8_t type = *(data++);
   
   uint8_t flags = type & 0xf0;
   type &= 0xf;
@@ -277,19 +279,22 @@ bool handle_packet(client *c) {
     }
     case MSG_OPEN: {
       dstr doc_name = dstr_retain(c->client_doc_name);
+      if (data == end) return true;
+      uint8_t open_flags = *(data++);
       dstr doc_type = read_string(&data, end); // an empty string if the type isn't specified.
       if (doc_type == NULL) return true;
       uint32_t version;
       READ_INT32(version); // UINT32_MAX means 'use the current version'.
       client_retain(c);
-      handle_open(c, doc_name, doc_type, version, flags & (MSG_FLAG_SNAPSHOT | MSG_FLAG_CREATE),
-                  ^(char *error, ot_document *doc, uint8_t flags) {
-        write_req *req = req_for_immediate_writing_to(c, MSG_OPEN | flags, doc_name, error);
+      handle_open(c, doc_name, doc_type, version, open_flags,
+                  ^(char *error, ot_document *doc, uint8_t open_flags) {
+        write_req *req = req_for_immediate_writing_to(c, MSG_OPEN, doc_name, error);
         dstr_release(doc_name);
         dstr_release(doc_type);
         if (!error) {
+          buf_uint8(&req->buffer, open_flags);
           buf_uint32(&req->buffer, doc->version);
-          if (flags & MSG_FLAG_SNAPSHOT) {
+          if (open_flags & OPEN_FLAG_SNAPSHOT) {
             buf_zstring(&req->buffer, doc->type->name);
             buf_uint64(&req->buffer, doc->ctime);
             buf_uint64(&req->buffer, doc->mtime);

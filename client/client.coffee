@@ -13,11 +13,14 @@ MSG_GET_OPS = 6
 
 MSG_OP_ACK = 7
 
-MSG_FLAG_SNAPSHOT = 0x10
-MSG_FLAG_CREATE = 0x20
-
 MSG_FLAG_ERROR = 0x40
 MSG_FLAG_HAS_DOC_NAME = 0x80
+
+
+OPEN_FLAG_SNAPSHOT = 1
+OPEN_FLAG_CREATE = 2
+OPEN_FLAG_TRACK_CURSORS = 4
+OPEN_FLAG_HAS_CURSOR = 8
 
 PROTOCOL_VERSION = 0
 
@@ -112,11 +115,14 @@ connect = (port, host, cb) ->
 
     console.log "trying to open #{docName}, type: #{opts.type}"
 
-    flags = 0
-    flags |= MSG_FLAG_SNAPSHOT if opts.snapshot
-    flags |= MSG_FLAG_CREATE if opts.create
+    open_flags = 0
+    open_flags |= OPEN_FLAG_SNAPSHOT if opts.snapshot
+    open_flags |= OPEN_FLAG_CREATE if opts.create
+    open_flags |= OPEN_FLAG_TRACK_CURSORS if opts.trackCursors
+    open_flags |= OPEN_FLAG_HAS_CURSOR if opts.hasCursor
 
-    p = preparePacket MSG_OPEN | flags, docName
+    p = preparePacket MSG_OPEN, docName
+    p.uint8 open_flags
     p.zstring opts.type || ''
     p.uint32 0xffffffff # uint32_max for the version
     writePacket p
@@ -184,11 +190,13 @@ connect = (port, host, cb) ->
       when MSG_OPEN
         return c.emit 'open', error, sDocName if error
 
+        openFlags = packet.uint8()
+
         data =
-          create: !!(flags & MSG_FLAG_CREATE)
+          create: !!(openFlags & OPEN_FLAG_CREATE)
           v: packet.uint32()
 
-        if flags & MSG_FLAG_SNAPSHOT
+        if openFlags & OPEN_FLAG_SNAPSHOT
           data.type = packet.zstring()
           data.ctime = packet.uint64()
           data.mtime = packet.uint64()

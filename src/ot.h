@@ -14,22 +14,30 @@ typedef void (*write_fn)(void *bytes, size_t num, void *user);
 
 struct _ot_type {
   char *name;
-  size_t op_size; // Expected size in bytes of an op
+  size_t op_size; // size in bytes of the op type
   
+  // size in bytes of the cursor type. Must be stable between 32bit / 64bit platforms.
+  size_t cursor_size;
+  
+  // Create a document
   void *(*create)();
+  // Destroy the document
   void (*free)(void *doc);
   
   // Read an op from binary bytes. Returns bytes read on success, negative errcode on failure.
   ssize_t (*read_op)(ot_op *result, void *data, size_t length);
+  // Write an op to a byte stream. This could take a pointer to a buffer instead.. Eh.
   void (*write_op)(ot_op *op, write_fn write, void *user);
   
-  // Read fn goes here.
+  // Read fn should be here.
+  
+  // Write a document to a byte stream.
   void (*write_doc)(void *doc, write_fn write, void *user);
   
   int (*check)(void *doc, const ot_op *op);
   void (*apply)(void *doc, ot_op *op);
   
-  // COMPOSE!
+  // Compose should be here.
   void (*transform)(ot_op *result, ot_op *op1, ot_op *op2, bool isLeft);
 };
 
