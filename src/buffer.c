@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "buffer.h"
+#include "ot.h"
 
 void buf_init(buffer *b) {
   // Is this a good size? Who knows. Benchmark me maybe?
@@ -21,7 +22,7 @@ void *_buf_insert_pos(buffer *b, size_t length) {
   size_t old_pos = b->pos;
   b->pos += length;
   if (b->pos > b->capacity) {
-    do  {
+    do {
       b->capacity *= 2;
     } while (b->pos > b->capacity);
     
@@ -42,20 +43,7 @@ void buf_zstring(buffer *b, const char *str) {
   buf_zstring_len(b, str, strlen(str));
 }
 
-static void buf_write_fn(void *bytes, size_t num, void *user) {
-  buffer *b = (buffer *)user;
+void buf_bytes(buffer *b, void *bytes, size_t num) {
   void *start = _buf_insert_pos(b, num);
   memcpy(start, bytes, num);
-}
-
-void buf_op(buffer *b, ot_type *type, ot_op *op) {
-  type->write_op(op, buf_write_fn, b);
-}
-
-void buf_doc(buffer *b, ot_type *type, void *snapshot) {
-  type->write_doc(snapshot, buf_write_fn, b);
-}
-
-void buf_cursor(buffer *b, ot_type *type, ot_cursor cursor) {
-  type->write_cursor(cursor, buf_write_fn, b);
 }

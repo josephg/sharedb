@@ -301,7 +301,7 @@ bool handle_packet(client *c) {
             buf_zstring(&req->buffer, doc->type->name);
             buf_uint64(&req->buffer, doc->ctime);
             buf_uint64(&req->buffer, doc->mtime);
-            buf_doc(&req->buffer, doc->type, doc->snapshot);
+            doc->type->write_doc(doc->snapshot, &req->buffer);
             // Also need to add cursors.
           }
           
@@ -315,7 +315,7 @@ bool handle_packet(client *c) {
               if (pair->client != c && pair->has_cursor) { // && within timeout?
                 buf_uint32(b, pair->client->cid);
                 // & client name
-                buf_cursor(b, doc->type, pair->cursor);
+                doc->type->write_cursor(pair->cursor, b);
               }
             }
             buf_uint32(b, 0);
@@ -383,7 +383,7 @@ void broadcast_op_to_clients(ot_document *doc, client *source, uint32_t version,
     if (pair->client != source) {
       write_req *req = req_for_immediate_writing_to(pair->client, MSG_OP, doc->name, NULL);
       buf_uint32(&req->buffer, version);
-      buf_op(&req->buffer, doc->type, op);
+      doc->type->write_op(op, &req->buffer);
       client_write(pair->client, req);
     }
   }

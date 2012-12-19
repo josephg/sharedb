@@ -2,6 +2,7 @@
 
 #include <rope.h>
 #include "text.h"
+#include "buffer.h"
 
 static void *create_tc() {
   return rope_new();
@@ -15,22 +16,26 @@ static ssize_t read_op_tc(ot_op *result_out, void *data, size_t length) {
   return text_op_from_bytes(&result_out->text, data, length);
 }
 
-void write_op_tc(ot_op *op, write_fn write, void *user) {
-  text_op_to_bytes(&op->text, write, user);
+static void buf_write_fn(void *bytes, size_t num, void *user) {
+  buffer *buf = (buffer *)user;
+  buf_bytes(buf, bytes, num);
+}
+
+void write_op_tc(ot_op *op, buffer *buf) {
+  text_op_to_bytes(&op->text, buf_write_fn, buf);
 }
 
 // Text docs are written as a big NULL-terminated string.
-void write_doc_tc(void *doc, write_fn write, void *user) {
+void write_doc_tc(void *doc, buffer *buf) {
   ROPE_FOREACH((rope *)doc, n) {
-    write(rope_node_data(n), rope_node_num_bytes(n), user);
+    buf_bytes(buf, rope_node_data(n), rope_node_num_bytes(n));
   }
   // And a NULL terminator.
-  uint8_t zero = '\0';
-  write(&zero, 1, user);
+  buf_uint8(buf, 0);
 }
 
-void write_cursor_tc(ot_cursor cursor, write_fn write, void *user) {
-  write(&cursor.pos, sizeof(uint32_t), user);
+void write_cursor_tc(ot_cursor cursor, buffer *buf) {
+  buf_uint32(buf, cursor.pos);
 }
 
 static int check_tc(void *doc, const ot_op *op) {
