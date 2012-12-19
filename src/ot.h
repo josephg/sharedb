@@ -30,8 +30,8 @@ struct ot_type_t {
   // Destroy the document
   void (*free)(void *doc);
   
-  // Read an op from binary bytes. Returns bytes read on success, negative errcode on failure.
-  ssize_t (*read_op)(ot_op *result, void *data, size_t length);
+  // Read an op from binary bytes. Returns false success, true on failure.
+  bool (*read_op)(ot_op *result, struct buffer_t *buf);
   // Write an op to a byte stream. This could take a pointer to a buffer instead.. Eh.
   void (*write_op)(ot_op *op, struct buffer_t *buf);
   

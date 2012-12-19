@@ -131,8 +131,9 @@ static void handle_op(client *client, uint32_t version, buffer *packet,
       return;
     }
     ot_op op;
-    ssize_t bytes_read = doc->type->read_op(&op, b, op_data_size);
-    if (bytes_read < 0) {
+    buffer buf = {b, (uint32_t)op_data_size};
+    bool err = doc->type->read_op(&op, &buf);
+    if (err) {
       // Error parsing the op.
       if (callback) callback("Error parsing op", UINT32_MAX);
       return;

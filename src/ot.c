@@ -12,8 +12,13 @@ static void free_tc(void *doc) {
   rope_free((rope *)doc);
 }
 
-static ssize_t read_op_tc(ot_op *result_out, void *data, size_t length) {
-  return text_op_from_bytes(&result_out->text, data, length);
+static bool read_op_tc(ot_op *result_out, buffer *buf) {
+  ssize_t bytes_read = text_op_from_bytes(
+       &result_out->text, &buf->bytes[buf->pos], buf->length - buf->pos);
+  
+  if (bytes_read < 0) return true;
+  buf->pos += bytes_read;
+  return false;
 }
 
 static void buf_write_fn(void *bytes, size_t num, void *user) {
