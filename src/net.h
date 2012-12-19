@@ -78,8 +78,6 @@ enum open_flags {
 
   // C->S this indiciates the client wants to know about all user cursors in the document.
   OPEN_FLAG_TRACK_CURSORS = 0x4,
-  // C->S this means the client's cursor should be visible to other users.
-  OPEN_FLAG_HAS_CURSOR = 0x8,
 };
 
 typedef struct client_t {

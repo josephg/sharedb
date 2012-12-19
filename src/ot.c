@@ -39,10 +39,6 @@ void write_doc_tc(void *doc, buffer *buf) {
   buf_uint8(buf, 0);
 }
 
-void write_cursor_tc(ot_cursor cursor, buffer *buf) {
-  buf_uint32(buf, cursor.pos);
-}
-
 static int check_tc(void *doc, const ot_op *op) {
   return text_op_check((rope *)doc, &op->text);
 }
@@ -53,6 +49,20 @@ static void apply_tc(void *doc, ot_op *op) {
 
 static void transform_tc(ot_op *result_out, ot_op *op1, ot_op *op2, bool isLeft) {
   result_out->text = text_op_transform(&op1->text, &op2->text, isLeft);
+}
+
+ot_cursor read_cursor_tc(buffer *buf, bool *err) {
+  ot_cursor result;
+  result.pos = buf_read_uint32(buf, err);
+  return result;
+}
+
+void write_cursor_tc(ot_cursor cursor, buffer *buf) {
+  buf_uint32(buf, cursor.pos);
+}
+
+void transform_cursor_tc(ot_cursor *cursor, ot_op *op, bool is_own_cursor) {
+  cursor->pos = (uint32_t)text_op_transform_cursor(cursor->pos, &op->text, is_own_cursor);
 }
 
 /*
@@ -78,13 +88,15 @@ const ot_type text_composable = {
   
   write_doc_tc,
   
-  write_cursor_tc,
-  
   check_tc,
   apply_tc,
   
   // COMPOSE!
-  transform_tc
+  transform_tc,
+  
+  read_cursor_tc,
+  write_cursor_tc,
+  transform_cursor_tc,
 };
 
 ot_type *ot_type_with_name(const char *name) {

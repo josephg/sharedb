@@ -20,7 +20,6 @@ MSG_FLAG_HAS_DOC_NAME = 0x80
 OPEN_FLAG_SNAPSHOT = 1
 OPEN_FLAG_CREATE = 2
 OPEN_FLAG_TRACK_CURSORS = 4
-OPEN_FLAG_HAS_CURSOR = 8
 
 PROTOCOL_VERSION = 0
 
@@ -121,7 +120,6 @@ connect = (port, host, cb) ->
 
     # These are on by default.
     open_flags |= OPEN_FLAG_TRACK_CURSORS unless opts.trackCursors is false
-    open_flags |= OPEN_FLAG_HAS_CURSOR unless opts.hasCursor is false
 
     p = preparePacket MSG_OPEN, docName
     p.uint8 open_flags

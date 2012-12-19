@@ -1,12 +1,14 @@
-#include "db.h"
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
 #ifdef __BLOCKS__
 #include <Block.h>
 #endif
-#include "protocol.h"
 #include <sys/time.h>
+
+#include "db.h"
+#include "protocol.h"
 
 /*
 static ot_document doc_add(database *db, char *name, ot_type *type, void *initial_data) {
@@ -200,6 +202,13 @@ void db_apply_op(const database *db, client *source,
   doc->version++;
   
   doc->mtime = time_ms();
+  
+  // Update all the document cursors based on the applied op
+  for (open_pair *pair = doc->open_pair_head; pair; pair = pair->next_client) {
+    if (pair->has_cursor) {
+      doc->type->transform_cursor(&pair->cursor, &op_local, pair->client == source);
+    }
+  }
   
   if (callback) callback(NULL, user, doc->version);
   

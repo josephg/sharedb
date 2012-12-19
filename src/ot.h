@@ -30,9 +30,9 @@ struct ot_type_t {
   // Destroy the document
   void (*free)(void *doc);
   
-  // Read an op from binary bytes. Returns false success, true on failure.
+  // Read an op. Returns false success, true on failure.
   bool (*read_op)(ot_op *result, struct buffer_t *buf);
-  // Write an op to a byte stream. This could take a pointer to a buffer instead.. Eh.
+  // Write an op.
   void (*write_op)(ot_op *op, struct buffer_t *buf);
   
   // Read doc fn.
@@ -40,14 +40,18 @@ struct ot_type_t {
   // Write a document to a byte stream.
   void (*write_doc)(void *doc, struct buffer_t *buf);
   
-  // Read cursor fn
-  void (*write_cursor)(ot_cursor cursor, struct buffer_t *buf);
-  
   int (*check)(void *doc, const ot_op *op);
   void (*apply)(void *doc, ot_op *op);
   
   // Compose should be here.
-  void (*transform)(ot_op *result, ot_op *op1, ot_op *op2, bool isLeft);
+  void (*transform)(ot_op *result, ot_op *op1, ot_op *op2, bool is_left);
+  
+  ot_cursor (*read_cursor)(struct buffer_t *buf, bool *err);
+  void (*write_cursor)(ot_cursor cursor, struct buffer_t *buf);
+  
+  // Transform a cursor by an operation. is_own_cursor is set if the op was sent by the cursor's
+  // owner. This is so we can make sure your own typing always pushes your cursor.
+  void (*transform_cursor)(ot_cursor *cursor, ot_op *op, bool is_own_cursor);
 };
 
 typedef const struct ot_type_t ot_type;

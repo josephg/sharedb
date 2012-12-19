@@ -36,7 +36,7 @@ static void open_internal(client *client, ot_document *doc, uint32_t version, ui
   pair->client = client;
   pair->doc = doc;
   pair->tracks_cursors = open_flags & OPEN_FLAG_TRACK_CURSORS;
-  pair->has_cursor = open_flags & OPEN_FLAG_HAS_CURSOR;
+  pair->has_cursor = false; // open_flags & OPEN_FLAG_HAS_CURSOR;
   pair->cursor = (ot_cursor){};
   
   pair->next = client->open_docs_head;
@@ -162,15 +162,6 @@ static char *handle_close(client *client, dstr doc_name) {
   return "Doc is not open";
 }
 
-static bool read_bytes(void *dest, void *src, void *end, size_t length) {
-  if (length + src >= end) {
-    return true;
-  }
-  
-  memcpy(dest, src, length);
-  return false;
-}
-
 // This creates and returns a write request that must be sent to client_write before
 // the main loop resumes.
 static write_req *req_for_immediate_writing_to(client *c, uint8_t type,
@@ -206,6 +197,18 @@ static write_req *req_for_immediate_writing_to(client *c, uint8_t type,
   return req;
 }
 
+static void broadcast_cursor_to_clients(ot_document *doc, client *source, ot_cursor cursor) {
+  for (open_pair *pair = doc->open_pair_head; pair; pair = pair->next_client) {
+    if (pair->client != source && pair->tracks_cursors) {
+      write_req *req = req_for_immediate_writing_to(
+              pair->client, MSG_CURSOR | MSG_CURSOR_SET, doc->name, NULL);
+      buf_uint32(&req->buffer, source->cid);
+      doc->type->write_cursor(cursor, &req->buffer);
+      client_write(pair->client, req);
+    }
+  }
+}
+
 // Handle a pending packet. There must be a packet's worth of buffers waiting in c.
 // Returning true here indicates an unrecoverable error and the client socket is terminated.
 bool handle_packet(client *c) {
@@ -214,7 +217,7 @@ bool handle_packet(client *c) {
   
   buffer packet = {c->packet, c->packet_length, 0};
   
-  bool err;
+  bool err = false;
   uint8_t type = buf_read_int8(&packet, &err);
   if (err) return true;
   
@@ -343,7 +346,35 @@ bool handle_packet(client *c) {
       break;
     }
     case MSG_CURSOR: {
+      if ((flags & MSG_CURSOR_REPLACE_ALL) != MSG_CURSOR_SET) {
+        // For now you can only set your cursor. You can't remove it or anything useful like that.
+        return true;
+      }
+
+      open_pair *pair;
+      for (open_pair *o = c->open_docs_head; o; o = o->next) {
+        if (dstr_eq(c->client_doc_name, o->doc->name)) {
+          // Found it.
+          o->cursor = o->doc->type->read_cursor(&packet, &err);
+          o->has_cursor = true;
+          
+          if (err) return true;
+          pair = o;
+          break;
+        }
+      }
       
+      // We don't usually respond to cursor movement packets - but for this error we'll
+      // make an exception.
+      if (pair == NULL) {
+        write_req *req = req_for_immediate_writing_to(c, MSG_OP_ACK,
+                                                      c->client_doc_name, "Doc is not open");
+        client_write(c, req);
+      } else {
+        broadcast_cursor_to_clients(pair->doc, pair->client, pair->cursor);
+      }
+      
+      break;
     }
       
     default:
@@ -360,8 +391,8 @@ bool handle_packet(client *c) {
 }
 
 void broadcast_op_to_clients(ot_document *doc, client *source, uint32_t version, ot_op *op) {
-  // TODO: Speed this up by only serializing the op once, and copy the serialized bytes to each
-  // subsequent client.
+  // TODO: Try speeding this up by only serializing the op once, and copy the serialized bytes to
+  // each subsequent client.
   for (open_pair *pair = doc->open_pair_head; pair; pair = pair->next_client) {
     if (pair->client != source) {
       write_req *req = req_for_immediate_writing_to(pair->client, MSG_OP, doc->name, NULL);
