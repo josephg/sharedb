@@ -118,8 +118,10 @@ connect = (port, host, cb) ->
     open_flags = 0
     open_flags |= OPEN_FLAG_SNAPSHOT if opts.snapshot
     open_flags |= OPEN_FLAG_CREATE if opts.create
-    open_flags |= OPEN_FLAG_TRACK_CURSORS if opts.trackCursors
-    open_flags |= OPEN_FLAG_HAS_CURSOR if opts.hasCursor
+
+    # These are on by default.
+    open_flags |= OPEN_FLAG_TRACK_CURSORS unless opts.trackCursors is false
+    open_flags |= OPEN_FLAG_HAS_CURSOR unless opts.hasCursor is false
 
     p = preparePacket MSG_OPEN, docName
     p.uint8 open_flags

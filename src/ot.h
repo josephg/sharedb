@@ -10,6 +10,10 @@ typedef union ot_op_t {
   text_op text;
 } ot_op;
 
+typedef union ot_cursor_t {
+  uint32_t pos;
+} ot_cursor;
+
 typedef void (*write_fn)(void *bytes, size_t num, void *user);
 
 struct _ot_type {

@@ -16,7 +16,7 @@ c.open docName, type:'text', snapshot:true, create:true, (e, {v, type, snapshot}
 
   c.sendOp docName, v, ["#{v} "]
 
-  c.close docName
+  #c.close docName
 
 c.on 'op applied', (e, docName, v) ->
   return console.error "Could not apply op: #{e}" if e

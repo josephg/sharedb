@@ -35,7 +35,9 @@ static void open_internal(client *client, ot_document *doc, uint32_t version, ui
   open_pair *pair = open_pair_alloc();
   pair->client = client;
   pair->doc = doc;
-  pair->tracks_cursors = true; // Make me based on flags passed in the open request
+  pair->tracks_cursors = open_flags & OPEN_FLAG_TRACK_CURSORS;
+  pair->has_cursor = open_flags & OPEN_FLAG_HAS_CURSOR;
+  pair->cursor = (ot_cursor){};
   
   pair->next = client->open_docs_head;
   client->open_docs_head = pair;

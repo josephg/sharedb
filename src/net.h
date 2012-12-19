@@ -6,6 +6,7 @@
 #include "uv.h"
 #include "dstr.h"
 #include "buffer.h"
+#include "ot.h"
 
 struct client_t;
 struct uv_loop_s;
@@ -23,6 +24,8 @@ typedef struct open_doc_pair_t {
   struct ot_document_t *doc;
   
   bool tracks_cursors;
+  bool has_cursor;
+  ot_cursor cursor;
   
   // The next open_doc for this client
   struct open_doc_pair_t *next;
