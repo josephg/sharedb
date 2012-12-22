@@ -19,7 +19,7 @@ struct ot_document_t;
 //
 // Submitting an op to a document also takes O(m) time, m = number of clients with the document
 // open.
-typedef struct open_doc_pair_t {
+typedef struct open_pair_t {
   struct client_t *client;
   struct ot_document_t *doc;
   
@@ -28,10 +28,10 @@ typedef struct open_doc_pair_t {
   ot_cursor cursor;
   
   // The next open_doc for this client
-  struct open_doc_pair_t *next;
+  struct open_pair_t *next;
   
-  struct open_doc_pair_t *prev_client;
-  struct open_doc_pair_t *next_client;
+  struct open_pair_t *prev_client;
+  struct open_pair_t *next_client;
   
 } open_pair;
 

@@ -153,6 +153,7 @@ static char *handle_close(client *client, dstr doc_name) {
       } else {
         client->open_docs_head = o->next;
       }
+      broadcast_remove_cursor(o);
       close_pair(o);
       return NULL;
     }
@@ -207,6 +208,25 @@ static void broadcast_cursor_to_clients(ot_document *doc, client *source, ot_cur
       client_write(pair->client, req);
     }
   }
+}
+
+void broadcast_remove_cursor(open_pair *pair) {
+  if (!pair->has_cursor) {
+    return;
+  }
+  
+  client *client = pair->client;
+  ot_document *doc = pair->doc;
+  
+  for (open_pair *o = doc->open_pair_head; o; o = o->next_client) {
+    if (o != pair) {
+      write_req *req = req_for_immediate_writing_to(
+            o->client, MSG_CURSOR | MSG_CURSOR_REMOVE, doc->name, NULL);
+      buf_uint32(&req->buffer, client->cid);
+      client_write(o->client, req);
+    }
+  }
+  pair->has_cursor = false;
 }
 
 // Handle a pending packet. There must be a packet's worth of buffers waiting in c.

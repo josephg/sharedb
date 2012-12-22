@@ -59,6 +59,8 @@ void client_release(client *client) {
     
     // Close all the documents the client still has open
     for (open_pair *o = client->open_docs_head; o;) {
+      broadcast_remove_cursor(o);
+      
       open_pair *prev = o;
       o = o->next;
       close_pair(prev);

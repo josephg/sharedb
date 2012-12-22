@@ -7,6 +7,7 @@
 
 struct client_t;
 struct ot_document_t;
+struct open_pair_t;
 union ot_op_t;
 
 // Handle the pending packet waiting in the client.
@@ -15,5 +16,7 @@ bool handle_packet(struct client_t *c);
 // Notify the clients that an op has been sent on a document it has open.
 void broadcast_op_to_clients(struct ot_document_t *doc, struct client_t *source,
                              uint32_t version, union ot_op_t *op);
+
+void broadcast_remove_cursor(struct open_pair_t *pair);
 
 #endif
