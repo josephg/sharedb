@@ -212,8 +212,9 @@ connect = (port, host, cb) ->
           throw new Error 'Error receiving op? What does that even?'
 
         v = packet.uint32()
+        clientId = packet.uint32()
         op = readOp packet, 'text'
-        c.emit 'op', null, sDocName, v, op
+        c.emit 'op', null, sDocName, v, op, clientId
 
       when MSG_OP_ACK
         return c.emit 'op applied', error, sDocName if error

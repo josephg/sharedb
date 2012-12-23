@@ -63,12 +63,12 @@ webserver.use browserChannel opts, (client) ->
     {v, type, snapshot, ctime, mtime, create} = data
     client.send doc:docName, open:true, v:v, snapshot:snapshot, create:create, meta:{ctime, mtime}
 
-  server.on 'op', (err, docName, v, op) ->
+  server.on 'op', (err, docName, v, op, clientId) ->
     console.log 'retransmitting op', doc:docName, v:v-1, op:op
     # It doesn't really make sense to get an error here.
     throw new Error(err) if err
 
-    client.send doc:docName, v:v-1, op:op, meta:{} # Meta should contain source:
+    client.send doc:docName, v:v-1, op:op, meta:{source:clientId}
 
   server.on 'op applied', (err, docName, v) ->
     return client.send doc:docName, v:null, error:err if err

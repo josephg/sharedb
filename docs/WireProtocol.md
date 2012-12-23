@@ -81,6 +81,13 @@ Errors:
 - __Invalid version__: The requested version is newer than the document's actual version. (Use `UINT32_MAX` to open the most recent version of the document)
 - __Cannot fetch historical snapshots__: The snapshot at a particular version was requested. You shouldn't request a document snapshot and specify a version in the same open request.
 
+Once a document is open, the server will send any submitted operations to the client. These operations have a packet type of _op_ and have the form of:
+
+- (_uint32_) Document version at which the operation was applied
+- (_uint32_) The ID of the client which submitted the operation
+- (_op_) The operation itself. Serialization format depends on the op type. Refer to the appendix below.
+
+
 ### Close
 
 Close the current document. This message has no payload. The server responds with another close message, again with no payload beyond the optional error message.

@@ -428,6 +428,7 @@ void broadcast_op_to_clients(ot_document *doc, client *source, uint32_t version,
     if (pair->client != source) {
       write_req *req = req_for_immediate_writing_to(pair->client, MSG_OP, doc->name, NULL);
       buf_uint32(&req->buffer, version);
+      buf_uint32(&req->buffer, source->cid);
       doc->type->write_op(op, &req->buffer);
       client_write(pair->client, req);
     }
