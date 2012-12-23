@@ -83,7 +83,11 @@ Errors:
 
 ### Close
 
-Close the current document.
+Close the current document. This message has no payload. The server responds with another close message, again with no payload beyond the optional error message.
+
+Be aware when writing clients that you may still receive operations between when the close request is sent and when the close response comes back from the server.
+
+The server will not send any more operations to the client after sending the close response. Closing also removes the user's cursor from the document, and announces that to other uses who have the document open.
 
 Errors:
 
@@ -95,13 +99,69 @@ A submit op message is used to send an operation to the server. The server will 
 
 A submit op request contains the following fields:
 - (_uint32_) Document version at which the operation should be applied
-- (op) The operation itself. The serialization format depends on the op type. Refer to the appendix below to see how ops of each type are serialised.
+- (_op_) The operation itself. The serialization format depends on the op type. Refer to the appendix below to see how ops of each type are serialised.
 
 ### Op acknowledgement
 
 When a client sends an op to the server, the server replies to that client with an op acknowledgement. The acknowledgement simply contains the new server version number (uint32).
 
 The acknowledgement will be in-order with surrounding ops from other clients.
+
+### Cursors
+
+Each client on each document can have a cursor. For text documents, the cursor is simply an int32 specifying where the user's looking. For more complicated types like JSON, the cursor may be a full path.
+
+Cursor data is transitory - that is, its not stored between server restarts or anything like that. Its not implemented yet, but I'd like to have cursors disappear after a timeout as well.
+
+When a client opens a document, it can specify the *track cursors* flag. This requests cursor information from the server about the other connected clients.
+
+There are three cursor information packet types - _set_, _remove_ and _replace all_. The cursor packet type is sent in the flags (high 4 bits) of the packet type byte.
+
+- _Set_ (`0x10`) messages contain the cursor information for a single client. These are first sent by a client then rebroadcast by the server to all interested parties listening on a document.
+- _Remove_ (`0x20`) messages remove the cursor information for one client from a document. These are usually sent when a client disconnects from the server or closes their open document.
+- _Replace all_ (`0x30`) messages contain the cursor information for an entire document. These are usually sent by the server to a client with a newly open document.
+
+By default, clients do not have cursors in the documents they edit. To get a visible cursor, a client must initialise their cursor position with a set message.
+
+Cursors are automatically moved whenever a client submits an operation using the OT type's `transformCursor` function. When an operation is submitted, the user who submitted the operation's cursor is teleported to the site of the edit. Other user's cursors slide around appropriately.
+
+#### Cursor set operations
+
+When a user moves their cursor inside a document, their client should send a cursor set operation to the server specifying the new cursor position. The client also tells the server what version the user was looking at when they moved the cursor.
+
+**Note:** This operation cannot be sent while the client has an editing operation in-flight to the server. This is because there is no valid version number which describes the state of the document on the client. The client should wait until the server acknowledges their operation before sending any new cursor information. The operation itself will move the user's cursor automatically, so while a user is typing you shouldn't be sending cursor set packets anyway.
+
+Client to server cursor set operations have the following fields:
+
+- (_uint32_) Version at which the cursor was moved. This will usually be the most recent document version the client knows about.
+- (_cursor_) The cursor data itself. For the text type, this is simply a _uint32_.
+
+Server to client set operations are slightly different:
+
+- (_uint32_) ID of the client whose cursor has moved
+- (_cursor_) The cursor data itself. For the text type, this is simply a _uint32_.
+
+The version is implicitly the document's current version.
+
+####  Cursor remove operations
+
+Client originated cursor remove messages aren't currently supported.
+
+The server will broadcast cursor remove messages which only contain the ID of the client whose cursor has moved (_uint32_).
+
+#### Cursor replace all operations
+
+Some time after a client opens a document, the server will send the client a cursor replace all operation. This operation will give the client a snapshot of all cursors currently in the document.
+
+This packet looks like this:
+
+- Pairs of:
+-- (_uint32_) Client ID
+-- (_cursor_) Cursor data
+- (_uint32_) Zero.
+
+The list is null client ID-terminated. (Zero is not a valid client ID).
+
 
 ----
 
