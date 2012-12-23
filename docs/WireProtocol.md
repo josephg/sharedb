@@ -143,6 +143,14 @@ Client to server cursor set operations have the following fields:
 - (_uint32_) Version at which the cursor was moved. This will usually be the most recent document version the client knows about.
 - (_cursor_) The cursor data itself. For the text type, this is simply a _uint32_.
 
+The server usually doesn't reply to set cursor operations. It will when there's an error though.
+
+Errors:
+
+- __Doc is not open__: The client tried to set a cursor on a closed document
+- __Cursor at future version__: The version specified in the cursor set message was invalid
+
+
 Server to client set operations are slightly different:
 
 - (_uint32_) ID of the client whose cursor has moved
