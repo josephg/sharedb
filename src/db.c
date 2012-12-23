@@ -229,3 +229,15 @@ void db_apply_op_b(const database *db, client *source,
   db_apply_op(db, source, doc, version, op, (void *)Block_copy(callback), _apply_op_b_cb);
 }
 #endif
+
+void db_transform_cursor(ot_document *doc, ot_cursor *cursor, uint32_t version) {
+  assert(doc);
+  assert(cursor);
+  assert(version <= doc->version);
+  
+  while (version < doc->version) {
+    ot_op *op = (ot_op *)(doc->op_cache + doc->type->op_size * version);
+    // This method gets called when a user moves their cursor around.
+    doc->type->transform_cursor(cursor, op, false);
+  }
+}

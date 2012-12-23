@@ -198,7 +198,7 @@ static write_req *req_for_immediate_writing_to(client *c, uint8_t type,
   return req;
 }
 
-static void broadcast_cursor_to_clients(ot_document *doc, client *source, ot_cursor cursor) {
+static void broadcast_set_cursor(ot_document *doc, client *source, ot_cursor cursor) {
   for (open_pair *pair = doc->open_pair_head; pair; pair = pair->next_client) {
     if (pair->client != source && pair->tracks_cursors) {
       write_req *req = req_for_immediate_writing_to(
@@ -219,7 +219,7 @@ void broadcast_remove_cursor(open_pair *pair) {
   ot_document *doc = pair->doc;
   
   for (open_pair *o = doc->open_pair_head; o; o = o->next_client) {
-    if (o != pair) {
+    if (o != pair && o->tracks_cursors) {
       write_req *req = req_for_immediate_writing_to(
             o->client, MSG_CURSOR | MSG_CURSOR_REMOVE, doc->name, NULL);
       buf_uint32(&req->buffer, client->cid);
@@ -371,14 +371,10 @@ bool handle_packet(client *c) {
         return true;
       }
 
-      open_pair *pair;
+      open_pair *pair = NULL;
       for (open_pair *o = c->open_docs_head; o; o = o->next) {
         if (dstr_eq(c->client_doc_name, o->doc->name)) {
           // Found it.
-          o->cursor = o->doc->type->read_cursor(&packet, &err);
-          o->has_cursor = true;
-          
-          if (err) return true;
           pair = o;
           break;
         }
@@ -387,13 +383,28 @@ bool handle_packet(client *c) {
       // We don't usually respond to cursor movement packets - but for this error we'll
       // make an exception.
       if (pair == NULL) {
-        write_req *req = req_for_immediate_writing_to(c, MSG_OP_ACK,
-                                                      c->client_doc_name, "Doc is not open");
-        client_write(c, req);
-      } else {
-        broadcast_cursor_to_clients(pair->doc, pair->client, pair->cursor);
+        client_write(c, req_for_immediate_writing_to(
+              c, MSG_CURSOR, c->client_doc_name, "Doc is not open"));
+        break;
       }
       
+      uint32_t v = buf_read_uint32(&packet, &err);
+      ot_document *doc = pair->doc;
+      ot_cursor cursor = doc->type->read_cursor(&packet, &err);
+      
+      if (err) return true;
+      if (v > doc->version) {
+        client_write(c, req_for_immediate_writing_to(
+              c, MSG_CURSOR, c->client_doc_name, "Cursor at future version"));
+        break;
+      }
+      
+      db_transform_cursor(doc, &cursor, v);
+      
+      pair->cursor = cursor;
+      pair->has_cursor = true;
+      
+      broadcast_set_cursor(doc, c, cursor);
       break;
     }
       

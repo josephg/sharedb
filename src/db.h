@@ -147,4 +147,8 @@ void db_get_ops(database *db, const dstr doc_name, void *dest, size_t vstart, si
                 void *user, db_get_ops_cb callback);
 */
 
+// Transform a cursor at the specified version to the most recent document verison.
+// version must be <= doc->version.
+void db_transform_cursor(ot_document *doc, ot_cursor *cursor, uint32_t version);
+
 #endif
