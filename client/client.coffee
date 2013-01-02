@@ -13,6 +13,10 @@ MSG_GET_OPS = 6
 
 MSG_OP_ACK = 7
 
+MSG_FLAG_CURSOR_SET = 0x10
+MSG_FLAG_CURSOR_REMOVE = 0x20
+MSG_FLAG_CURSOR_REPLACE_ALL = 0x30
+
 MSG_FLAG_ERROR = 0x40
 MSG_FLAG_HAS_DOC_NAME = 0x80
 
@@ -46,6 +50,10 @@ readOp = (packet, type) ->
         {d:packet.uint32()}
       else
         throw new Error 'Invalid op component type'
+
+readCursor = (packet, type) ->
+  throw new Error "Don't know how to read cursors of type #{type}" unless type is 'text'
+  [packet.uint32(), packet.uint32()]
 
 connect = (port, host, cb) ->
   if typeof host is 'function'
@@ -166,6 +174,13 @@ connect = (port, host, cb) ->
         callback error
     c.once 'close', listener if callback
 
+  c.setCursor = (docName, v, cursor) ->
+    p = preparePacket MSG_CURSOR | MSG_FLAG_CURSOR_SET, docName
+    p.uint32 v
+    p.uint32 cursor[0]
+    p.uint32 cursor[1]
+    writePacket p
+
   client.on 'data', require('./buffer') (b) ->
     return if closed # Don't want to emit any data after close() is called
     packet = binary.read b
@@ -222,9 +237,31 @@ connect = (port, host, cb) ->
         v = packet.uint32()
         c.emit 'op applied', null, sDocName, v
 
+      when MSG_CURSOR
+        break if error # For now, we'll just swallow cursor set errors.
+
+        switch flags
+          when MSG_FLAG_CURSOR_SET
+            client = packet.uint32()
+            data = {}
+            data[client] = readCursor packet, 'text'
+            c.emit 'cursor', null, sDocName, data
+
+          when MSG_FLAG_CURSOR_REMOVE
+            client = packet.uint32()
+            data = {}
+            data[client] = null
+            c.emit 'cursor', null, sDocName, data
+
+          when MSG_FLAG_CURSOR_REPLACE_ALL
+            data = {}
+            while (client = packet.uint32()) != 0
+              # THIS WONT WORK FOR ANYTHING BUT THE TEXT TYPE!
+              data[client] = readCursor packet, 'text'
+            c.emit 'cursor', null, sDocName, data
+
       else
         console.log "Unhandled type #{type}"
-
   c
 
 module.exports = connect

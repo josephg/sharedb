@@ -55,6 +55,8 @@ webserver.use browserChannel opts, (client) ->
       when data.op isnt undefined
         # Submit op
         server.sendOp data.doc, data.v, data.op
+      when data.cursor
+        server.setCursor data.doc, data.v, data.cursor
       else
         console.log data
 
@@ -77,6 +79,11 @@ webserver.use browserChannel opts, (client) ->
     # In contrast, ShareDB acknowledges using the new server version. Hence v-1.
     client.send doc:docName, v:v-1
    
+  server.on 'cursor', (err, docName, data) ->
+    if err
+      client.send doc:docName, cursor:null, error:err
+    else
+      client.send doc:docName, cursor:data
 
 
 webserver.listen 7000

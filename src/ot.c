@@ -51,18 +51,20 @@ static void transform_tc(ot_op *result_out, ot_op *op1, ot_op *op2, bool isLeft)
   result_out->text = text_op_transform(&op1->text, &op2->text, isLeft);
 }
 
-ot_cursor read_cursor_tc(buffer *buf, bool *err) {
+static ot_cursor read_cursor_tc(buffer *buf, bool *err) {
   ot_cursor result;
-  result.pos = buf_read_uint32(buf, err);
+  result.text.start = buf_read_uint32(buf, err);
+  result.text.end = buf_read_uint32(buf, err);
   return result;
 }
 
-void write_cursor_tc(ot_cursor cursor, buffer *buf) {
-  buf_uint32(buf, cursor.pos);
+static void write_cursor_tc(ot_cursor cursor, buffer *buf) {
+  buf_uint32(buf, (uint32_t)cursor.text.start);
+  buf_uint32(buf, (uint32_t)cursor.text.end);
 }
 
-void transform_cursor_tc(ot_cursor *cursor, ot_op *op, bool is_own_cursor) {
-  cursor->pos = (uint32_t)text_op_transform_cursor(cursor->pos, &op->text, is_own_cursor);
+static void transform_cursor_tc(ot_cursor *cursor, ot_op *op, bool is_own_cursor) {
+  cursor->text = text_op_transform_cursor(cursor->text, &op->text, is_own_cursor);
 }
 
 /*

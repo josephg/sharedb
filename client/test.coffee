@@ -10,10 +10,14 @@ console.log c
 
 docName = 'hi2'
 c.auth()
+
+c.once 'has id', (id) -> console.log "my id is #{id}"
+
 c.open docName, type:'text', snapshot:true, create:true, (e, {v, type, snapshot}) ->
   return console.log "error opening document: #{e}" if e
   console.log "opened #{docName} at version #{v} type #{type} snapshot '#{snapshot}'"
 
+  c.setCursor docName, v, [0,0]
   c.sendOp docName, v, ["#{v} "]
 
   #c.close docName
@@ -26,4 +30,6 @@ c.on 'op', (e, docName, v, op) ->
   console.log "Got an op on #{docName}. Now at v#{v}"
   console.log op
 
+c.on 'cursor', (e, docName, data) ->
+  console.log 'cursor data: ', data
 

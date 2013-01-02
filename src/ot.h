@@ -13,7 +13,7 @@ typedef union ot_op_t {
 } ot_op;
 
 typedef union ot_cursor_t {
-  uint32_t pos;
+  text_cursor text;
 } ot_cursor;
 
 typedef void (*write_fn)(void *bytes, size_t num, void *user);
