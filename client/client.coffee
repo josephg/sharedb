@@ -38,16 +38,15 @@ readSnapshot = (packet, type) ->
 readOp = (packet, type) ->
   throw new Error "Don't know how to read ops of type #{type}" unless type is 'text'
 
-  n = packet.uint16()
-  for c in [0...n]
-    type = packet.uint8()
+  op = []
+  while (type = packet.uint8())
     switch type
       when OP_COMPONENT_SKIP
-        packet.uint32()
+        op.push packet.uint32()
       when OP_COMPONENT_INSERT
-        packet.zstring()
+        op.push packet.zstring()
       when OP_COMPONENT_DELETE
-        {d:packet.uint32()}
+        op.push {d:packet.uint32()}
       else
         throw new Error 'Invalid op component type'
 
@@ -148,7 +147,6 @@ connect = (port, host, cb) ->
 
     p = preparePacket MSG_OP, docName
     p.uint32 version
-    p.uint16 op.length
     for o in op
       if typeof o is 'number'
         p.uint8 1
@@ -161,7 +159,9 @@ connect = (port, host, cb) ->
         p.uint32 o.d
       else
         throw new Error "Invalid op component: #{o}"
+      p.uint8 0
 
+    console.log 'asdffds'
     writePacket p
 
   c.close = (docName, callback) ->
