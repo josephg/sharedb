@@ -186,11 +186,12 @@ The list is null client ID-terminated. (Zero is not a valid client ID).
 
 Text ops are encoded in binary as follows:
 
-- (_uint16_): Number of operation components (N)
-- Followed by N op components:
+- List of:
 -- (_uint8_) Op type (SKIP = 1, INSERT = 3, DELETE = 4)
 -- If the type is SKIP, _uint32_ skip size
 -- If the type is INSERT, _string_ inserted text
 -- If the type is DELETE, _uint32_ deleted region size
+
+The list is terminated with a null op type.
 
 Text documents are simply serialized as strings.

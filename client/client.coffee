@@ -50,6 +50,8 @@ readOp = (packet, type) ->
       else
         throw new Error 'Invalid op component type'
 
+  op
+
 readCursor = (packet, type) ->
   throw new Error "Don't know how to read cursors of type #{type}" unless type is 'text'
   [packet.uint32(), packet.uint32()]
@@ -159,9 +161,8 @@ connect = (port, host, cb) ->
         p.uint32 o.d
       else
         throw new Error "Invalid op component: #{o}"
-      p.uint8 0
+    p.uint8 0
 
-    console.log 'asdffds'
     writePacket p
 
   c.close = (docName, callback) ->
@@ -242,22 +243,22 @@ connect = (port, host, cb) ->
 
         switch flags
           when MSG_FLAG_CURSOR_SET
-            client = packet.uint32()
+            cid = packet.uint32()
             data = {}
-            data[client] = readCursor packet, 'text'
+            data[cid] = readCursor packet, 'text'
             c.emit 'cursor', null, sDocName, data
 
           when MSG_FLAG_CURSOR_REMOVE
-            client = packet.uint32()
+            cid = packet.uint32()
             data = {}
-            data[client] = null
+            data[cid] = null
             c.emit 'cursor', null, sDocName, data
 
           when MSG_FLAG_CURSOR_REPLACE_ALL
             data = {}
-            while (client = packet.uint32()) != 0
+            while (cid = packet.uint32()) != 0
               # THIS WONT WORK FOR ANYTHING BUT THE TEXT TYPE!
-              data[client] = readCursor packet, 'text'
+              data[cid] = readCursor packet, 'text'
             c.emit 'cursor', null, sDocName, data
 
       else
