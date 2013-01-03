@@ -54,7 +54,10 @@ readOp = (packet, type) ->
 
 readCursor = (packet, type) ->
   throw new Error "Don't know how to read cursors of type #{type}" unless type is 'text'
-  [packet.uint32(), packet.uint32()]
+  start = packet.uint32()
+  end = packet.uint32()
+
+  if start == end then start else [start, end]
 
 connect = (port, host, cb) ->
   if typeof host is 'function'
@@ -178,8 +181,12 @@ connect = (port, host, cb) ->
   c.setCursor = (docName, v, cursor) ->
     p = preparePacket MSG_CURSOR | MSG_FLAG_CURSOR_SET, docName
     p.uint32 v
-    p.uint32 cursor[0]
-    p.uint32 cursor[1]
+    if typeof cursor is 'number'
+      p.uint32 cursor
+      p.uint32 cursor
+    else
+      p.uint32 cursor[0]
+      p.uint32 cursor[1]
     writePacket p
 
   client.on 'data', require('./buffer') (b) ->
