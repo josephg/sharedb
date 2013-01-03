@@ -40,11 +40,13 @@ struct ot_type_t {
   // Write a document to a byte stream.
   void (*write_doc)(void *doc, struct buffer_t *buf);
   
-  int (*check)(void *doc, const ot_op *op);
+  int (*check_op)(void *doc, const ot_op *op);
   void (*apply)(void *doc, ot_op *op);
   
   // Compose should be here.
   void (*transform)(ot_op *result, ot_op *op1, ot_op *op2, bool is_left);
+  
+  int (*check_cursor)(void *doc, ot_cursor cursor);
   
   ot_cursor (*read_cursor)(struct buffer_t *buf, bool *err);
   void (*write_cursor)(ot_cursor cursor, struct buffer_t *buf);

@@ -189,7 +189,7 @@ void db_apply_op(const database *db, client *source,
     version++;
   }
   
-  if (doc->type->check(doc->snapshot, &op_local)) {
+  if (doc->type->check_op(doc->snapshot, &op_local)) {
     if (callback) callback("Op invalid", user, 0);
     return;
   }

@@ -55,7 +55,7 @@ webserver.use browserChannel opts, (client) ->
       when data.op isnt undefined
         # Submit op
         server.sendOp data.doc, data.v, data.op
-      when data.cursor
+      when data.cursor isnt undefined
         server.setCursor data.doc, data.v, data.cursor
       else
         console.log data

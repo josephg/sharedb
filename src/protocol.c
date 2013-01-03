@@ -391,6 +391,12 @@ bool handle_packet(client *c) {
       uint32_t v = buf_read_uint32(&packet, &err);
       ot_document *doc = pair->doc;
       ot_cursor cursor = doc->type->read_cursor(&packet, &err);
+
+      if (doc->type->check_cursor(doc->snapshot, cursor)) {
+        client_write(c, req_for_immediate_writing_to(
+             c, MSG_CURSOR, c->client_doc_name, "Cursor invalid"));
+        break;
+      }
       
       if (err) return true;
       if (v > doc->version) {

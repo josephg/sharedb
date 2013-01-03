@@ -51,6 +51,10 @@ static void transform_tc(ot_op *result_out, ot_op *op1, ot_op *op2, bool isLeft)
   result_out->text = text_op_transform(&op1->text, &op2->text, isLeft);
 }
 
+static int check_cursor_tc(void *doc, ot_cursor cursor) {
+  return text_cursor_check(doc, cursor.text);
+}
+
 static ot_cursor read_cursor_tc(buffer *buf, bool *err) {
   ot_cursor result;
   result.text.start = buf_read_uint32(buf, err);
@@ -95,6 +99,8 @@ const ot_type text_composable = {
   
   // COMPOSE!
   transform_tc,
+  
+  check_cursor_tc,
   
   read_cursor_tc,
   write_cursor_tc,

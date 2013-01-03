@@ -148,6 +148,7 @@ The server usually doesn't reply to set cursor operations. It will when there's 
 Errors:
 
 - __Doc is not open__: The client tried to set a cursor on a closed document
+- __Cursor invalid__: The cursor data is not valid for some reason. For text documents, this will happen when the cursor range is outside of the document.
 - __Cursor at future version__: The version specified in the cursor set message was invalid
 
 
