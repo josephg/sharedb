@@ -239,5 +239,6 @@ void db_transform_cursor(ot_document *doc, ot_cursor *cursor, uint32_t version) 
     ot_op *op = (ot_op *)(doc->op_cache + doc->type->op_size * version);
     // This method gets called when a user moves their cursor around.
     doc->type->transform_cursor(cursor, op, false);
+    version++;
   }
 }
